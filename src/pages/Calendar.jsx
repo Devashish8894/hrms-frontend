@@ -17,7 +17,7 @@ export default function Calendar({ employeeProfile, currentUser }) {
     const eid = profile.employee_id || 1;
 
     // Fetch Employees (for birthdays and anniversaries)
-    fetch(`http://localhost:5002/api/admin/employees?orgId=1`)
+    fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/admin/employees?orgId=1`)
         .then(res => res.json())
         .then(data => {
             if (Array.isArray(data)) {
@@ -33,7 +33,7 @@ export default function Calendar({ employeeProfile, currentUser }) {
 
     if (uid) {
         // Fetch Holidays (the widgets endpoint still returns allHolidays safely)
-        fetch(`http://localhost:5002/api/dashboard/widgets/${uid}`)
+        fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/dashboard/widgets/${uid}`)
             .then(res => res.json())
             .then(data => {
                 if (data.allHolidays) {
@@ -76,7 +76,7 @@ export default function Calendar({ employeeProfile, currentUser }) {
             .catch(console.error);
 
         // Fetch Leaves using UID (backend expects user_id for /api/leaves/data/)
-        fetch(`http://localhost:5002/api/leaves/data/${uid}`)
+        fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/leaves/data/${uid}`)
             .then(res => res.json())
             .then(data => {
                 if (data.requests) {

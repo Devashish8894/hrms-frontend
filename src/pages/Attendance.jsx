@@ -22,7 +22,7 @@ export default function Attendance({ currentUser, employeeProfile }) {
     const fetchReport = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`http://localhost:5002/api/attendance/page/${currentUser.id}?month=${month}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/attendance/page/${currentUser.id}?month=${month}`);
         const data = await res.json();
         setReport(data);
 

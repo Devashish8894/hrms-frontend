@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-const API_BASE = "http://localhost:5002";
+const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
 
 const requestCategories = [
   "Attendance Correction",

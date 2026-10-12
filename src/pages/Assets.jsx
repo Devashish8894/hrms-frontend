@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const API_BASE = "http://localhost:5002";
+const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
 
 const TYPE_META = {
   laptop: { icon: "bi-laptop", cls: "laptop", label: "Laptop" },

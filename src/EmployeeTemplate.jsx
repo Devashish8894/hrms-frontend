@@ -112,7 +112,7 @@ export default function EmployeeTemplate({
 
     useEffect(() => {
         if (currentUser?.id) {
-            fetch(`http://localhost:5002/api/dashboard/widgets/${currentUser.id}`)
+            fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/dashboard/widgets/${currentUser.id}`)
                 .then(res => res.json())
                 .then(data => {
                     if (!data.error) setWidgetsData(data);
@@ -123,19 +123,19 @@ export default function EmployeeTemplate({
 
   useEffect(() => {
       if (currentUser?.id) {
-          fetch(`http://localhost:5002/api/leaves/data/${currentUser.id}`)
+          fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/leaves/data/${currentUser.id}`)
               .then(res => res.json())
               .then(data => setLeavesData(data || { balances: [], requests: [] }))
               .catch(err => console.error(err));
 
-          fetch(`http://localhost:5002/api/assets/requests/${currentUser.id}`)
+          fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/assets/requests/${currentUser.id}`)
               .then(res => res.json())
               .then(data => {
                   if (data && data.requests) setAssetRequests(data.requests);
               })
               .catch(console.error);
 
-          fetch(`http://localhost:5002/api/attendance/corrections/${currentUser.id}`)
+          fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/attendance/corrections/${currentUser.id}`)
               .then(res => res.json())
               .then(data => {
                   if (data && data.corrections) setAttendanceCorrections(data.corrections);

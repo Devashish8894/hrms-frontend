@@ -14,7 +14,7 @@ export default function EmploymentDetails({ employeeProfile, currentUser }) {
 
   useEffect(() => {
     if (currentUser?.id) {
-      fetch(`http://localhost:5002/api/employee/profile/${currentUser.id}`)
+      fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/employee/profile/${currentUser.id}`)
         .then(res => res.json())
         .then(data => {
           if (!data.message) {
@@ -36,7 +36,7 @@ export default function EmploymentDetails({ employeeProfile, currentUser }) {
     if (!profile.employee_id) return;
     setUpdating(true);
     try {
-      const response = await fetch(`http://localhost:5002/api/employee/${profile.employee_id}/work-mode`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/employee/${profile.employee_id}/work-mode`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ work_mode: mode })

@@ -48,7 +48,7 @@ export default function Leaves({ currentUser, employeeProfile }) {
     if (!currentUser) return;
     try {
       setLoading(true);
-      const res = await fetch(`http://localhost:5002/api/leaves/data/${currentUser.id}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/leaves/data/${currentUser.id}`);
       const result = await res.json();
       if (result.error) {
           console.error(result.error);
@@ -87,7 +87,7 @@ export default function Leaves({ currentUser, employeeProfile }) {
     setSubmittingLeave(true);
     setLeaveSubmitError("");
     try {
-      const response = await fetch(`http://localhost:5002/api/leaves/apply`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/leaves/apply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1112,7 +1112,7 @@ export default function Leaves({ currentUser, employeeProfile }) {
                           </button>
                           <button type="button" className="btn text-white px-4 fw-medium rounded-3 d-flex align-items-center gap-2 ms-auto" style={{ backgroundColor: '#4e36f5' }} onClick={async () => {
                               try {
-                                  const res = await fetch(`http://localhost:5002/api/leaves/update/${viewLeave.id}`, {
+                                  const res = await fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/leaves/update/${viewLeave.id}`, {
                                       method: 'PUT',
                                       headers: { 'Content-Type': 'application/json' },
                                       body: JSON.stringify({
