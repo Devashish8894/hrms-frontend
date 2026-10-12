@@ -1,0 +1,1677 @@
+import React, { useState, useEffect } from "react";
+import Chart from "react-apexcharts";
+import EmployeeProfile from "./pages/EmployeeProfile";
+import EmploymentDetails from "./pages/EmploymentDetails";
+import Documents from "./pages/Documents";
+import SkillsCertifications from "./pages/SkillsCertifications";
+import Attendance from "./pages/Attendance";
+import Leaves from "./pages/Leaves";
+import Assets from "./pages/Assets";
+import AccessAccounts from "./pages/AccessAccounts";
+import Notifications from "./pages/Notifications";
+import Settings from "./pages/Settings";
+import ExitManagement from "./pages/ExitManagement";
+import EmployeeRequests from "./pages/EmployeeRequests";
+import Calendar from "./pages/Calendar";
+import HRAssistant from "./components/HRAssistant";
+
+export default function EmployeeTemplate({
+  currentUser, handleLogout,
+  attendanceStatus, checkInTime, checkOutTime, workingTime,
+  attendanceLoading, handleCheckIn, handleCheckOut, fetchAttendance, employeeProfile, attendanceStats, fetchAttendanceStats
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activePage, setActivePage] = useState("index");
+  const [statsPeriod, setStatsPeriod] = useState("week");
+  const [leavesData, setLeavesData] = useState({ balances: [], requests: [] });
+  const [assetRequests, setAssetRequests] = useState([]);
+  const [attendanceCorrections, setAttendanceCorrections] = useState([]);
+  const [widgetsData, setWidgetsData] = useState({ nextHoliday: null, upcomingBirthday: null, upcomingAnniversary: null });
+
+  // Page key to URL path mapping
+  const pageToPath = {
+    "index": "/",
+    "employee-profile": "/employee-profile",
+    "employement-details": "/employment-details",
+    "documents": "/documents",
+    "skills-certifications": "/skills-certifications",
+    "employee-requests": "/employee-requests",
+    "attendance": "/attendance",
+    "leaves": "/leave",
+    "assets": "/assets",
+    "access-accounts": "/access-accounts",
+    "calendar": "/calendar",
+    "notifications": "/notifications",
+    "settings": "/settings",
+    "exit-management": "/exit-management",
+  };
+
+  // URL path back to page key mapping
+  const pathToPage = {
+    "/": "index",
+    "/employee-profile": "employee-profile",
+    "/employment-details": "employement-details",
+    "/documents": "documents",
+    "/skills-certifications": "skills-certifications",
+    "/employee-requests": "employee-requests",
+    "/attendance": "attendance",
+    "/leave": "leaves",
+    "/assets": "assets",
+    "/access-accounts": "access-accounts",
+    "/calendar": "calendar",
+    "/notifications": "notifications",
+    "/settings": "settings",
+    "/exit-management": "exit-management",
+  };
+
+  // Navigate helper: sets page, closes Bootstrap offcanvas + backdrop, updates URL
+  const navigateTo = (page) => {
+    setActivePage(page);
+    setMenuOpen(false);
+    const offcanvasEl = document.getElementById("mainMenu");
+    if (offcanvasEl) {
+      // Try Bootstrap API first
+      if (window.bootstrap) {
+        const instance = window.bootstrap.Offcanvas.getInstance(offcanvasEl);
+        if (instance) instance.hide();
+      }
+      // Force-remove backdrop immediately after animation ends (Bootstrap sometimes leaves it)
+      const cleanupBackdrop = () => {
+        document.querySelectorAll(".offcanvas-backdrop").forEach(el => el.remove());
+        document.body.classList.remove("modal-open");
+        document.body.style.removeProperty("overflow");
+        document.body.style.removeProperty("padding-right");
+        offcanvasEl.classList.remove("show");
+        offcanvasEl.style.removeProperty("visibility");
+      };
+      // Run immediately AND after animation (300ms) to cover both cases
+      cleanupBackdrop();
+      setTimeout(cleanupBackdrop, 320);
+    }
+    const path = pageToPath[page] || "/" + page;
+    window.history.pushState({ page }, "", path);
+  };
+
+  // On mount: read URL to set initial page; handle back/forward
+  useEffect(() => {
+    const path = window.location.pathname;
+    const page = pathToPage[path];
+    if (page) {
+      setActivePage(page);
+    }
+    const handlePopState = (e) => {
+      const p = window.location.pathname;
+      const pg = pathToPage[p] || "index";
+      setActivePage(pg);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+
+
+    useEffect(() => {
+        if (currentUser?.id) {
+            fetch(`http://localhost:5002/api/dashboard/widgets/${currentUser.id}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.error) setWidgetsData(data);
+                })
+                .catch(console.error);
+        }
+    }, [currentUser]);
+
+  useEffect(() => {
+      if (currentUser?.id) {
+          fetch(`http://localhost:5002/api/leaves/data/${currentUser.id}`)
+              .then(res => res.json())
+              .then(data => setLeavesData(data || { balances: [], requests: [] }))
+              .catch(err => console.error(err));
+
+          fetch(`http://localhost:5002/api/assets/requests/${currentUser.id}`)
+              .then(res => res.json())
+              .then(data => {
+                  if (data && data.requests) setAssetRequests(data.requests);
+              })
+              .catch(console.error);
+
+          fetch(`http://localhost:5002/api/attendance/corrections/${currentUser.id}`)
+              .then(res => res.json())
+              .then(data => {
+                  if (data && data.corrections) setAttendanceCorrections(data.corrections);
+              })
+              .catch(console.error);
+      }
+  }, [currentUser]);
+
+  const dashComputedBalances = (leavesData.balances || []).map(b => {
+      const typeName = b.leave_type_name;
+      const actualUsed = (leavesData.requests || [])
+          .filter(r => r.leave_type === typeName && r.status === 'Approved')
+          .reduce((sum, r) => sum + parseFloat(r.days_requested || 0), 0);
+      const remaining = parseFloat(b.total_days || 0) - actualUsed;
+      return { ...b, used_days: actualUsed, remaining_days: remaining };
+  });
+
+  const dashAnnual = dashComputedBalances.find(b => (b.leave_type_name || '').toLowerCase().includes('annual')) || {
+      leave_type_name: 'Annual Leave', total_days: 18, used_days: 1, remaining_days: 17
+  };
+  const dashSick = dashComputedBalances.find(b => (b.leave_type_name || '').toLowerCase().includes('sick')) || {
+      leave_type_name: 'Sick Leave', total_days: 10, used_days: 0, remaining_days: 10
+  };
+
+  const dashHolidaysList = leavesData.holidays || [];
+  const dashTotalHolidays = dashHolidaysList.length > 0 ? dashHolidaysList.length : 12;
+  const dashPassedHolidays = dashHolidaysList.filter(h => new Date(h.holiday_date) < new Date());
+  const dashUpcomingHolidays = dashHolidaysList.filter(h => new Date(h.holiday_date) >= new Date());
+
+  const dashHolidaysCompleted = dashPassedHolidays.length > 0 ? dashPassedHolidays.length : 10;
+  const dashHolidaysRemaining = dashUpcomingHolidays.length > 0 ? dashUpcomingHolidays.length : Math.max(0, dashTotalHolidays - dashHolidaysCompleted);
+
+  const dashDisplayCards = [
+      {
+          id: 'annual',
+          name: 'Annual Leave',
+          used: dashAnnual.used_days,
+          total: Number(dashAnnual.total_days) === Math.floor(dashAnnual.total_days) ? dashAnnual.total_days.toString().split(".")[0] : dashAnnual.total_days,
+          remaining: String(Math.floor(dashAnnual.remaining_days)).padStart(2, '0'),
+          percent: Math.round((parseFloat(dashAnnual.used_days) / (parseFloat(dashAnnual.total_days) || 1)) * 100),
+          dotClass: 'ed-dot-purple'
+      },
+      {
+          id: 'sick',
+          name: 'Sick Leave',
+          used: dashSick.used_days,
+          total: Number(dashSick.total_days) === Math.floor(dashSick.total_days) ? dashSick.total_days.toString().split(".")[0] : dashSick.total_days,
+          remaining: String(Math.floor(dashSick.remaining_days)).padStart(2, '0'),
+          percent: Math.round((parseFloat(dashSick.used_days) / (parseFloat(dashSick.total_days) || 1)) * 100),
+          dotClass: 'ed-dot-blue'
+      },
+      {
+          id: 'holiday',
+          name: 'Public Holidays',
+          used: dashHolidaysCompleted,
+          total: dashTotalHolidays,
+          remaining: String(dashHolidaysRemaining).padStart(2, '0'),
+          percent: Math.round((dashHolidaysCompleted / dashTotalHolidays) * 100),
+          dotClass: 'ed-dot-orange'
+      }
+  ];
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const dashUpcomingLeave = (leavesData.requests || [])
+      .filter(r => (r.status === 'Pending' || r.status === 'Approved') && new Date(r.start_date) >= today)
+      .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))[0] || 
+      (leavesData.requests || []).filter(r => r.status === 'Pending' || r.status === 'Approved').sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
+
+  // Dynamic Recent Requests for Dashboard (Leave Requests, Asset Requests, Attendance Corrections)
+  const pendingLeave = (leavesData.requests || []).find(r => r.status === 'Pending') || (leavesData.requests || [])[0];
+  const pendingAsset = (assetRequests || []).find(r => r.status === 'Pending') || (assetRequests || [])[0];
+  const pendingCorrection = (attendanceCorrections || []).find(r => r.status === 'Pending') || (attendanceCorrections || [])[0];
+
+  const recentDashboardRequests = [
+      // 1. Dynamic Leave Request
+      pendingLeave ? {
+          id: `leave-${pendingLeave.id}`,
+          title: 'Leave Request',
+          subtitle: `REQ-${String(pendingLeave.id).padStart(6, '0')} · ${new Date(pendingLeave.start_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short'})}${pendingLeave.start_date !== pendingLeave.end_date ? ' - ' + new Date(pendingLeave.end_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short'}) : ''}`,
+          status: pendingLeave.status,
+          statusClass: pendingLeave.status === 'Approved' ? 'ed-request-approved' : pendingLeave.status === 'Rejected' ? 'ed-request-rejected' : 'ed-request-pending',
+          icon: 'bi bi-calendar2-check',
+          iconBg: 'ed-request-purple'
+      } : null,
+
+      // 2. Dynamic Asset Request
+      pendingAsset ? {
+          id: `asset-${pendingAsset.id}`,
+          title: `Asset Request (${pendingAsset.asset_type ? pendingAsset.asset_type.charAt(0).toUpperCase() + pendingAsset.asset_type.slice(1) : 'Hardware'})`,
+          subtitle: `${pendingAsset.request_code || 'REQ-' + String(pendingAsset.id).padStart(6, '0')} · ${pendingAsset.created_at ? new Date(pendingAsset.created_at).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : 'Recently submitted'}`,
+          status: pendingAsset.status,
+          statusClass: pendingAsset.status === 'Approved' ? 'ed-request-approved' : pendingAsset.status === 'Rejected' ? 'ed-request-rejected' : pendingAsset.status === 'In Progress' ? 'ed-request-progress' : 'ed-request-pending',
+          icon: 'bi bi-laptop',
+          iconBg: 'ed-request-orange'
+      } : null,
+
+      // 3. Dynamic Attendance Correction Request
+      pendingCorrection ? {
+          id: `corr-${pendingCorrection.id}`,
+          title: 'Attendance Correction',
+          subtitle: `${pendingCorrection.request_code || 'REQ-' + String(pendingCorrection.id).padStart(6, '0')} · ${new Date(pendingCorrection.attendance_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'})}`,
+          status: pendingCorrection.status || 'Pending',
+          statusClass: pendingCorrection.status === 'Approved' ? 'ed-request-approved' : pendingCorrection.status === 'Rejected' ? 'ed-request-rejected' : pendingCorrection.status === 'Processing' ? 'ed-request-progress' : 'ed-request-pending',
+          icon: 'bi bi-clock-history',
+          iconBg: 'ed-request-blue'
+      } : null
+  ].filter(Boolean);
+
+  const currentYear = new Date().getFullYear();
+  const nationalHolidays = [
+      { holiday_date: `${currentYear}-01-01`, holiday_name: 'New Year\'s Day' },
+      { holiday_date: `${currentYear}-01-26`, holiday_name: 'Republic Day' },
+      { holiday_date: `${currentYear}-05-01`, holiday_name: 'Labour Day' },
+      { holiday_date: `${currentYear}-08-15`, holiday_name: 'Independence Day' },
+      { holiday_date: `${currentYear}-10-02`, holiday_name: 'Gandhi Jayanti' },
+      { holiday_date: `${currentYear}-12-25`, holiday_name: 'Christmas Day' },
+      { holiday_date: '2026-03-03', holiday_name: 'Holi' },
+      { holiday_date: '2026-04-10', holiday_name: 'Good Friday' },
+      { holiday_date: '2026-04-14', holiday_name: 'Ambedkar Jayanti' },
+      { holiday_date: '2026-08-26', holiday_name: 'Raksha Bandhan' },
+      { holiday_date: '2026-09-06', holiday_name: 'Janmashtami' },
+      { holiday_date: '2026-09-17', holiday_name: 'Ganesh Chaturthi' },
+      { holiday_date: '2026-10-20', holiday_name: 'Dussehra / Vijayadashami' },
+      { holiday_date: '2026-11-08', holiday_name: 'Diwali' },
+      { holiday_date: '2026-11-24', holiday_name: 'Guru Nanak Jayanti' }
+  ];
+  
+  const mergedHolidays = [...nationalHolidays, ...(widgetsData.allHolidays || [])];
+  const uniqueHolidaysMap = new Map();
+  mergedHolidays.forEach(h => {
+      const dateStr = new Date(h.holiday_date).toISOString().split('T')[0];
+      uniqueHolidaysMap.set(dateStr, h);
+  });
+  const finalHolidays = Array.from(uniqueHolidaysMap.values());
+
+  const dashNextHoliday = finalHolidays
+      .filter(h => new Date(h.holiday_date) >= today)
+      .sort((a,b) => new Date(a.holiday_date) - new Date(b.holiday_date))[0] || widgetsData.nextHoliday;
+
+
+  const chartOptions = {
+      chart: { type: "area", height: 255, toolbar: { show: false }, zoom: { enabled: false } },
+      dataLabels: { enabled: false },
+      markers: { size: 5, colors: ["#fff"], strokeColors: "#1E90FF", strokeWidth: 2, hover: { size: 7 } },
+      stroke: { curve: "smooth", width: 3 },
+      fill: {
+          type: "gradient",
+          gradient: { shadeIntensity: 1, opacityFrom: 0.2, opacityTo: 0.05, stops: [0, 90, 100] }
+      },
+      xaxis: {
+          categories: attendanceStats?.chartCategories || [],
+          labels: { style: { colors: "#8a90a2", fontSize: "12px", fontFamily: "inherit" } },
+          axisBorder: { show: false },
+          axisTicks: { show: false }
+      },
+      yaxis: {
+          labels: {
+              formatter: (value) => value + "h",
+              style: { colors: "#8a90a2", fontSize: "12px", fontFamily: "inherit" }
+          },
+          min: 0,
+          max: 10
+      },
+      grid: {
+          borderColor: "#f1f3f5", strokeDashArray: 4,
+          xaxis: { lines: { show: true } },
+          yaxis: { lines: { show: true } },
+          padding: { top: 0, right: 0, bottom: 0, left: 10 }
+      },
+      colors: ["#1E90FF"], // theme green
+      tooltip: {
+          theme: "light",
+          y: { formatter: (value) => value + " Hours" }
+      }
+  };
+
+
+  return (
+    <div onClick={() => setMenuOpen(false)}>
+
+
+    
+    <div className="offcanvas offcanvas-start custom-offcanvas" tabIndex="-1" id="mainMenu">
+        <div className="offcanvas-header">
+            <div className="menu-brand">
+                <div className="menu-brand-icon">
+                    <i className="bi bi-grid-1x2-fill"></i>
+                </div>
+                <div>
+                    <h5>Ramel | HR</h5>
+                    <span>Admin Workspace</span>
+                </div>
+            </div>
+            <button type="button" className="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div className="offcanvas-body p-0" style={{ overflowY: "auto", overflowX: "hidden", height: "calc(100vh - 100px)", paddingBottom: "100px" }}>
+            <div className="menu-nav" style={{paddingBottom: "3rem"}}>
+                  
+                  <span className="menu-label" style={{ fontSize: '11px', fontWeight: 700, color: '#8a90a2', marginLeft: '22px', marginBottom: '8px', display: 'block', marginTop: '16px', letterSpacing: '0.5px' }}>OVERVIEW</span>
+                  <span onClick={() => navigateTo("index")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-grid"></i>
+                      <span>Employee Dashboard</span>
+                  </span>
+
+                  <span className="menu-label" style={{ fontSize: '11px', fontWeight: 700, color: '#8a90a2', marginLeft: '22px', marginBottom: '8px', display: 'block', marginTop: '24px', letterSpacing: '0.5px' }}>EMPLOYEE INFORMATION</span>
+                  <span onClick={() => navigateTo("employee-profile")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-person-vcard"></i>
+                      <span>Employee Profile</span>
+                  </span>
+                  <span onClick={() => navigateTo("employement-details")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-briefcase"></i>
+                      <span>Employment Details</span>
+                  </span>
+                  <span onClick={() => navigateTo("documents")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-folder2-open"></i>
+                      <span>Documents</span>
+                  </span>
+                  <span onClick={() => navigateTo("skills-certifications")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-award"></i>
+                      <span>Skills & Certifications</span>
+                  </span>
+                  <span onClick={() => navigateTo("employee-requests")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-chat-text"></i>
+                      <span>Employee Requests</span>
+                  </span>
+
+                  <span className="menu-label" style={{ fontSize: '11px', fontWeight: 700, color: '#8a90a2', marginLeft: '22px', marginBottom: '8px', display: 'block', marginTop: '24px', letterSpacing: '0.5px' }}>ATTENDANCE & LEAVE</span>
+                  <span onClick={() => navigateTo("attendance")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-clock-history"></i>
+                      <span>Attendance</span>
+                  </span>
+                  <span onClick={() => navigateTo("leaves")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-calendar2-minus"></i>
+                      <span>Leave</span>
+                  </span>
+
+                  <span className="menu-label" style={{ fontSize: '11px', fontWeight: 700, color: '#8a90a2', marginLeft: '22px', marginBottom: '8px', display: 'block', marginTop: '24px', letterSpacing: '0.5px' }}>COMPANY RESOURCES</span>
+                  <span onClick={() => navigateTo("assets")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-laptop"></i>
+                      <span>Assets</span>
+                  </span>
+                  <span onClick={() => navigateTo("access-accounts")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-shield-lock"></i>
+                      <span>Access & Accounts</span>
+                  </span>
+
+                  <span className="menu-label" style={{ fontSize: '11px', fontWeight: 700, color: '#8a90a2', marginLeft: '22px', marginBottom: '8px', display: 'block', marginTop: '24px', letterSpacing: '0.5px' }}>COMMUNICATION</span>
+                  <span onClick={() => navigateTo("calendar")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-calendar-date"></i>
+                      <span>Calendar</span>
+                  </span>
+                  <span onClick={() => navigateTo("notifications")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-bell"></i>
+                      <span>Notifications</span>
+                  </span>
+                  <span onClick={() => navigateTo("settings")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-gear"></i>
+                      <span>Settings</span>
+                  </span>
+
+                  <span className="menu-label" style={{ fontSize: '11px', fontWeight: 700, color: '#8a90a2', marginLeft: '22px', marginBottom: '8px', display: 'block', marginTop: '24px', letterSpacing: '0.5px' }}>EMPLOYEE EXIT</span>
+                  <span onClick={() => navigateTo("exit-management")} className="menu-item" style={{cursor:"pointer"}}>
+                      <i className="bi bi-box-arrow-right"></i>
+                      <span>Resignation & Exit</span>
+                  </span>
+
+                  <span className="menu-label" style={{ fontSize: '11px', fontWeight: 700, color: '#8a90a2', marginLeft: '22px', marginBottom: '8px', display: 'block', marginTop: '24px', letterSpacing: '0.5px' }}>ACCOUNT</span>
+                  <a href="#!" className="menu-item text-danger" onClick={(e) => { e.preventDefault(); handleLogout(); }}>
+                      <i className="bi bi-box-arrow-left"></i>
+                      <span>Logout</span>
+                  </a>
+              </div>
+        </div>
+    </div>
+
+    
+    {/* Commented out Question Mark (?) Orbit Menu & Radial Nav as requested
+    <button className={`orbit-menu pulse ${menuOpen ? "open" : ""}`} id="menuToggle" aria-label="Quick navigation" onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}>
+        <span className="menu-icon">?</span>
+    </button>
+
+    <nav className={`radial-nav ${menuOpen ? "open" : ""}`} id="radialNav" onClick={(e) => e.stopPropagation()}>
+        <a href="#" className="active">
+            <i className="bi bi-grid-1x2-fill"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="#">
+            <i className="bi bi-people-fill"></i>
+            <span>Employees</span>
+        </a>
+        <a href="#">
+            <i className="bi bi-calendar2-check-fill"></i>
+            <span>Attendance</span>
+        </a>
+        <a href="#">
+            <i className="bi bi-wallet2"></i>
+            <span>Payroll</span>
+        </a>
+        <a href="#">
+            <i className="bi bi-bar-chart-fill"></i>
+            <span>Reports</span>
+        </a>
+    </nav>
+    */}
+
+    
+    <main className="dashboard-wrapper">
+        <div className="dashboard-container">
+
+            
+            <header className="top-header">
+
+                <div className="d-flex align-items-center justify-content-between">
+
+
+                    <span onClick={() => navigateTo("index")} className="brand-logo" style={{cursor:"pointer"}}>
+
+                        <div className="brand-icon">
+                            <i className="bi bi-grid-1x2-fill"></i>
+                        </div>
+
+                        <div>
+                            <h5>Ramel HR</h5>
+                            <span>Admin Workspace</span>
+                        </div>
+
+                    </span>
+
+
+                    <div className="d-flex align-items-center gap-3 header-actions">
+
+
+                        <button className="header-action">
+                            <i className="bi bi-search"></i>
+                        </button>
+
+
+                        <button className="header-action">
+
+                            <i className="bi bi-bell"></i>
+
+                            <span className="notification-dot"></span>
+
+                        </button>
+
+
+                        <div className="dropdown">
+
+                            <button className="profile-button" data-bs-toggle="dropdown">
+
+                                <div className="profile-avatar">{currentUser.email.slice(0, 2).toUpperCase()}</div>
+
+                                <div className="profile-info">
+
+                                    <h6>{currentUser.email}</h6>
+
+                                    <span className="text-nowrap">{employeeProfile?.role_name || "Employee"}</span>
+
+                                </div>
+
+                                <i className="bi bi-chevron-down"></i>
+
+                            </button>
+
+
+                            <ul className="dropdown-menu dropdown-menu-end border-0 shadow rounded-4 p-2">
+
+                                <li>
+                                    <a className="dropdown-item rounded-3 py-2" href="#">
+                                        <i className="bi bi-person me-2"></i>
+                                        My Profile
+                                    </a>
+                                </li>
+
+                                <li>
+                                    <a className="dropdown-item rounded-3 py-2" href="#">
+                                        <i className="bi bi-gear me-2"></i>
+                                        Settings
+                                    </a>
+                                </li>
+
+                                <li>
+                                    <hr className="dropdown-divider" />
+                                </li>
+
+                                <li>
+                                    <a className="dropdown-item rounded-3 py-2 text-danger" href="#">
+                                        <i className="bi bi-box-arrow-right me-2"></i>
+                                        Logout
+                                    </a>
+                                </li>
+
+                            </ul>
+
+                        </div>
+
+
+                        <button className="header-action" data-bs-toggle="offcanvas" data-bs-target="#mainMenu">
+
+                            <i className="bi bi-list"></i>
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </header>
+
+            
+            {activePage === "index" && (
+  <>
+<div className="px-0 px-md-5 employee-dashboard">
+
+                
+                <section className="page-heading employee-page-heading">
+                    <div className="row align-items-center g-3">
+
+                        <div className="col-lg-8">
+                            <div className="dashboard-title-wrap">
+
+                                <div>
+                                    <span className="dashboard-eyebrow">
+                                        EMPLOYEE DASHBOARD
+                                    </span>
+
+                                    <h2>Employee Dashboard</h2>
+
+                                    <p>
+                                        Monitor workforce activity, employee movements,
+                                        requests and important HR events from one place.
+                                    </p>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <div className="col-lg-4 text-lg-end">
+                            <div className="dashboard-date">
+                                <div className="dashboard-date-icon">
+                                    <i className="bi bi-calendar3"></i>
+                                </div>
+
+                                <div>
+                                    <span>Today</span>
+                                    <strong id="dashboardDate">
+                                        {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </strong>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </section>
+
+                <div className="employee-dashboard-page">
+
+                    
+                    <section className="ed-hero">
+                        <div className="ed-hero-main">
+                            <div className="ed-profile-avatar">
+                                <img src="https://i.pravatar.cc/150?img=12" alt="Anil Kumar" />
+                                <span className="ed-online-dot"></span>
+                            </div>
+
+                            <div className="ed-hero-content">
+                                <span className="ed-eyebrow">
+                                    <i className="bi bi-sun"></i>
+                                    {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                </span>
+
+                                <h1>Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, {employeeProfile ? (employeeProfile.first_name || currentUser.email.split("@")[0]) : currentUser.email.split("@")[0]}</h1>
+
+                                <p>
+                                    Here's your workspace overview for today.
+                                    Stay productive and have a great day.
+                                </p>
+
+                                <div className="ed-employee-meta">
+                                    <span>
+<i className="bi bi-person-badge"></i>
+{employeeProfile?.employee_code || "�"}
+</span>
+
+                                    <span>
+<i className="bi bi-briefcase"></i>
+{employeeProfile?.designation || "�"}
+</span>
+
+                                    <span>
+                                        <i className="bi bi-diagram-3"></i>
+                                        Engineering · Backend
+                                    </span>
+
+                                    <span>
+<i className="bi bi-geo-alt"></i>
+{employeeProfile?.city || "�"}
+</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="es-profile-completion">
+                            <div className="es-completion-top">
+                                <span>Profile Completion</span>
+                                <strong>{employeeProfile?.profile_completion_percentage || 0}%</strong>
+                            </div>
+                            <div className="progress es-progress">
+                                <div className="progress-bar" style={{width: (employeeProfile?.profile_completion_percentage || 0) + "%"}}></div>
+                            </div>
+                            <small>Complete your remaining profile details.</small>
+                        </div>
+                    </section>
+
+
+                    
+                    <section className="ed-section">
+
+                        <div className="ed-section-heading">
+                            <div>
+                                <span className="ed-section-label">TODAY</span>
+                                <h2>Workday Overview</h2>
+                            </div>
+
+                            <span className="ed-live-status">
+                                <span></span>
+                                Live attendance
+                            </span>
+                        </div>
+
+                        <div className="row g-4">
+
+                            
+                            <div className="col-xl-5 col-lg-6">
+
+                                <div className="ed-attendance-card">
+
+                                    <div className="ed-attendance-top">
+                                        <div>
+                                            <span className="ed-card-kicker">TODAY'S ATTENDANCE</span>
+                                            <h3 id="edAttendanceTitle">{attendanceStatus === "Checked In" ? "You're checked in" : attendanceStatus === "Checked Out" ? "You're checked out" : "Not checked in"}</h3>
+                                        </div>
+
+                                        <div className="ed-attendance-icon">
+                                            <i className="bi bi-fingerprint"></i>
+                                        </div>
+                                    </div>
+
+                                    <div className="ed-time-display">
+                                        <div className="ed-clock">
+                                            <span id="edCurrentTime">{checkInTime !== "--:--" ? checkInTime.split(" ")[0] : "--:--"}</span><small>{checkInTime !== "--:--" ? checkInTime.split(" ")[1] : ""}</small>
+                                        </div>
+                                        <div className="ed-work-location-badge" id="edWorkLocationBadge"
+                                            data-work-location="office" aria-label="Office, WFO">
+                                            <i className="bi bi-geo-alt-fill" aria-hidden="true"></i>
+                                            <span id="edWorkLocationLabel">{employeeProfile?.city || "Office"}</span>
+                                            <strong id="edWorkMode">{employeeProfile?.work_mode || "WFO"}</strong>
+                                        </div>
+                                    </div>
+
+                                    <div className="ed-attendance-date">
+                                        {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </div>
+
+                                    <div className="ed-attendance-progress">
+                                        <div className="ed-progress-top">
+                                            <span>Working time</span>
+                                            <strong id="edWorkingTime">{workingTime}</strong>
+                                        </div>
+
+                                        <div className="ed-progress-track">
+                                            <span id="edWorkProgress" style={{width: attendanceStatus === "Checked Out" ? "100%" : attendanceStatus === "Checked In" ? "50%" : "0%"}}></span>
+                                        </div>
+
+                                        <div className="ed-progress-bottom">
+                                            <span>09:00 AM</span>
+                                            <span>06:00 PM</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="ed-attendance-actions">
+                                        <button type="button" className="ed-checkin-btn" id="edCheckInBtn" onClick={handleCheckIn} disabled={attendanceLoading || attendanceStatus === "Checked In" || attendanceStatus === "Checked Out"}><i className="bi bi-box-arrow-in-right"></i>{attendanceLoading && attendanceStatus !== "Checked In" ? "..." : "Check In"}</button>
+
+                                        <button type="button" className="ed-checkout-btn" id="edCheckOutBtn" onClick={handleCheckOut} disabled={attendanceLoading || attendanceStatus !== "Checked In"}><i className="bi bi-box-arrow-right"></i>{attendanceLoading && attendanceStatus === "Checked In" ? "..." : "Check Out"}</button>
+                                    </div>
+
+                                    <div className="ed-attendance-footer">
+
+                                        <div>
+                                            <span>Check In</span>
+                                            <strong id="edCheckInTime">{checkInTime}</strong>
+                                        </div>
+
+                                        <div>
+                                            <span>Check Out</span>
+                                            <strong id="edCheckOutTime">{checkOutTime}</strong>
+                                        </div>
+
+                                        <div>
+                                            <span>Break</span>
+                                            <strong>1 hour</strong>
+                                        </div>
+
+                                                                                                                </div>
+                                  </div>
+                              </div>
+                              
+                              <div className="col-xl-7 col-lg-6">
+
+                                <div className="ed-work-stat-card">
+
+                                    <div className="ed-card-header">
+                                        <div>
+                                            <span className="ed-card-kicker">MY WORKDAY</span>
+                                            <h3>Today's summary</h3>
+                                        </div>
+
+                                        <select
+                                            className="ed-period-select"
+                                            value={statsPeriod}
+                                            onChange={(e) => {
+                                                const p = e.target.value;
+                                                setStatsPeriod(p);
+                                                fetchAttendanceStats(p);
+                                            }}
+                                        >
+                                            <option value="week">This Week</option>
+                                            <option value="month">This Month</option>
+                                            <option value="last_month">Last Month</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="row g-3">
+
+                                        {/* 1. Average Check-in */}
+                                        <div className="col-md-6">
+                                            <div className="ed-mini-stat">
+                                                <div className="ed-mini-stat-icon ed-blue">
+                                                    <i className="bi bi-clock-history"></i>
+                                                </div>
+
+                                                <div>
+                                                    <span>Average Check-in</span>
+                                                    <strong>{attendanceStats?.averageCheckIn || '--'}</strong>
+                                                    <small>{attendanceStats?.todayCheckInDiff || 'Not checked in'}</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 2. Average Hours */}
+                                        <div className="col-md-6">
+                                            <div className="ed-mini-stat">
+                                                <div className="ed-mini-stat-icon ed-purple">
+                                                    <i className="bi bi-calendar2-week"></i>
+                                                </div>
+
+                                                <div>
+                                                    <span>Average Hours</span>
+                                                    <strong>{attendanceStats?.avgHoursDisplay || '0h 00m'}</strong>
+                                                    <small>{attendanceStats?.periodLabel || (statsPeriod === 'month' ? 'This Month' : statsPeriod === 'last_month' ? 'Last Month' : 'This Week')}</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 3. On-Time */}
+                                        <div className="col-md-6">
+                                            <div className="ed-mini-stat">
+                                                <div className="ed-mini-stat-icon ed-green">
+                                                    <i className="bi bi-check-circle"></i>
+                                                </div>
+
+                                                <div>
+                                                    <span>On-Time</span>
+                                                    <strong>{attendanceStats?.onTimeDisplay || `${attendanceStats?.onTimeDays ?? 0} On-Time`}</strong>
+                                                    <small>{attendanceStats?.periodLabel || (statsPeriod === 'month' ? 'This Month' : statsPeriod === 'last_month' ? 'Last Month' : 'This Week')}</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 4. Late Arrivals */}
+                                        <div className="col-md-6">
+                                            <div className="ed-mini-stat">
+                                                <div className="ed-mini-stat-icon ed-orange">
+                                                    <i className="bi bi-clock"></i>
+                                                </div>
+
+                                                <div>
+                                                    <span>Late Arrivals</span>
+                                                    <strong>{attendanceStats?.lateDisplay || `${attendanceStats?.lateDays ?? 0} Late`}</strong>
+                                                    <small>{attendanceStats?.periodLabel || (statsPeriod === 'month' ? 'This Month' : statsPeriod === 'last_month' ? 'Last Month' : 'This Week')}</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 5. Overtime */}
+                                        <div className="col-md-6">
+                                            <div className="ed-mini-stat">
+                                                <div className="ed-mini-stat-icon ed-purple">
+                                                    <i className="bi bi-stopwatch"></i>
+                                                </div>
+
+                                                <div>
+                                                    <span>Overtime</span>
+                                                    <strong>{attendanceStats?.overtimeDisplay || '00h 00m OT'}</strong>
+                                                    <small>{attendanceStats?.periodLabel || (statsPeriod === 'month' ? 'This Month' : statsPeriod === 'last_month' ? 'Last Month' : 'This Week')}</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 6. Attendance */}
+                                        <div className="col-md-6">
+                                            <div className="ed-mini-stat">
+                                                <div className="ed-mini-stat-icon ed-green">
+                                                    <i className="bi bi-calendar-check"></i>
+                                                </div>
+
+                                                <div>
+                                                    <span>Attendance</span>
+                                                    <strong>{attendanceStats?.attendanceDisplay || `${attendanceStats?.attendancePercentage ?? 100}% Attendance`}</strong>
+                                                    <small>{attendanceStats?.periodLabel || (statsPeriod === 'month' ? 'This Month' : statsPeriod === 'last_month' ? 'Last Month' : 'This Week')}</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </section>
+
+
+                    
+                    <section className="ed-section ed-quick-section">
+
+                        <div className="ed-section-heading">
+                            <div>
+                                <span className="ed-section-label">SHORTCUTS</span>
+                                <h2>Quick Actions</h2>
+                            </div>
+                        </div>
+
+                        <div className="row g-3">
+
+                            <div className="col-xl col-lg-3 col-md-4 col-6">
+                                <button className="ed-quick-card">
+                                    <span className="ed-quick-icon ed-q-purple">
+                                        <i className="bi bi-calendar-plus"></i>
+                                    </span>
+                                    <strong>Apply Leave</strong>
+                                    <small>Request time off</small>
+                                </button>
+                            </div>
+
+                            <div className="col-xl col-lg-3 col-md-4 col-6">
+                                <button className="ed-quick-card">
+                                    <span className="ed-quick-icon ed-q-blue">
+                                        <i className="bi bi-calendar-check"></i>
+                                    </span>
+                                    <strong>Attendance</strong>
+                                    <small>View attendance</small>
+                                </button>
+                            </div>
+
+                            <div className="col-xl col-lg-3 col-md-4 col-6">
+                                <button className="ed-quick-card">
+                                    <span className="ed-quick-icon ed-q-orange">
+                                        <i className="bi bi-send"></i>
+                                    </span>
+                                    <strong>New Request</strong>
+                                    <small>Contact HR / Admin</small>
+                                </button>
+                            </div>
+
+                            <div className="col-xl col-lg-3 col-md-4 col-6">
+                                <button className="ed-quick-card">
+                                    <span className="ed-quick-icon ed-q-green">
+                                        <i className="bi bi-folder2-open"></i>
+                                    </span>
+                                    <strong>Documents</strong>
+                                    <small>My documents</small>
+                                </button>
+                            </div>
+
+                            <div className="col-xl col-lg-3 col-md-4 col-6">
+                                <button className="ed-quick-card">
+                                    <span className="ed-quick-icon ed-q-pink">
+                                        <i className="bi bi-laptop"></i>
+                                    </span>
+                                    <strong>My Assets</strong>
+                                    <small>Assigned equipment</small>
+                                </button>
+                            </div>
+
+                            <div className="col-xl col-lg-3 col-md-4 col-6">
+                                <button className="ed-quick-card">
+                                    <span className="ed-quick-icon ed-q-dark">
+                                        <i className="bi bi-person"></i>
+                                    </span>
+                                    <strong>My Profile</strong>
+                                    <small>View profile</small>
+                                </button>
+                            </div>
+
+                        </div>
+
+                    </section>
+
+
+                    
+                    <section className="ed-section">
+
+                        <div className="row g-4">
+
+                            
+                            <div className="col-xl-5 col-lg-6">
+
+                                <div className="ed-panel ed-leave-panel">
+
+                                    <div className="ed-panel-header">
+                                        <div>
+                                            <span className="ed-card-kicker">TIME OFF</span>
+                                            <h3>My Leave Balance</h3>
+                                        </div>
+
+                                        <button className="ed-text-action" onClick={(e) => { e.preventDefault(); setActivePage("leaves"); }}>
+                                              Apply Leave
+                                              <i className="bi bi-arrow-up-right"></i>
+                                          </button>
+                                    </div>
+
+                                    <div className="ed-leave-balance">
+                                      {dashDisplayCards.map((b) => (
+                                          <React.Fragment key={b.id}>
+                                              <div className="ed-leave-row">
+                                                  <div className="ed-leave-type">
+                                                      <span className={`ed-leave-dot ${b.dotClass}`}></span>
+                                                      <div>
+                                                          <strong>{b.name}</strong>
+                                                          <small>{b.used} used of {b.total} days</small>
+                                                      </div>
+                                                  </div>
+                                                  <strong className="ed-leave-number">{b.remaining}</strong>
+                                              </div>
+                                              <div className="ed-leave-track">
+                                                  <span style={{width: `${b.percent}%`}}></span>
+                                              </div>
+                                          </React.Fragment>
+                                      ))}
+
+                                    <div className="ed-leave-upcoming" style={{cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '15px', border: '1px solid #f1f3f5', borderRadius: '12px', marginTop: '15px'}} onClick={(e) => { e.preventDefault(); setActivePage("leaves"); }}>
+                                        <div className="ed-upcoming-icon" style={{ backgroundColor: '#f0f0ff', color: '#4e36f5', width: '36px', height: '36px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <i className="bi bi-calendar2-heart"></i>
+                                        </div>
+                                        <div style={{ flex: 1, marginLeft: '12px' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#4e36f5', textTransform: 'uppercase', letterSpacing: '0.5px' }}>UPCOMING LEAVE</span>
+                                            {dashUpcomingLeave ? (
+                                                <div style={{ marginTop: '2px' }}>
+                                                    <strong style={{ display: 'block', fontSize: '14px', color: '#24263d', fontWeight: '700' }}>
+                                                        {new Date(dashUpcomingLeave.start_date).toLocaleDateString('en-GB', {day: '2-digit'})} - {new Date(dashUpcomingLeave.end_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'})}
+                                                    </strong>
+                                                    <small style={{ color: '#8b8e9f', fontSize: '12px' }}>{dashUpcomingLeave.leave_type} - {Number(dashUpcomingLeave.days_requested)} {Number(dashUpcomingLeave.days_requested) === 1 ? 'day' : 'days'}</small>
+                                                </div>
+                                            ) : (
+                                                <div style={{ marginTop: '2px' }}>
+                                                    <strong style={{ display: 'block', fontSize: '14px', color: '#24263d', fontWeight: '700' }}>No upcoming leave</strong>
+                                                    <small style={{ color: '#8b8e9f', fontSize: '12px' }}>--</small>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <i className="bi bi-chevron-right" style={{ color: '#bdc1d1' }}></i>
+                                    </div>
+                                  </div>
+                              </div>
+                              </div>
+                              
+                              <div className="col-xl-7 col-lg-6">
+                                  <div className="ed-panel">
+                                      <div className="ed-panel-header">
+                                          <div>
+                                              <span className="ed-card-kicker">ATTENDANCE</span>
+                                              <h3>My attendance this week</h3>
+                                          </div>
+                                          <select className="ed-period-select" value={statsPeriod} onChange={(e) => { const p = e.target.value; setStatsPeriod(p); fetchAttendanceStats(p); }}>
+                                              <option value="week">This Week</option>
+                                              <option value="month">This Month</option>
+                                              <option value="last_month">Last Month</option>
+                                          </select>
+                                      </div>
+                                      <div className="ed-attendance-chart">
+                                          {attendanceLoading ? (
+                                              <div className="d-flex justify-content-center align-items-center h-100">
+                                                  <div className="spinner-border text-primary" role="status"></div>
+                                              </div>
+                                          ) : (
+                                              <Chart options={chartOptions} series={[{ name: "Working Hours", data: attendanceStats?.chartData || [] }]} type="area" height={255} />
+                                          )}
+                                      </div>
+                                      <div className="ed-attendance-footer" style={{ borderTop: '1px solid #f1f3f5', marginTop: '15px', paddingTop: '20px', display: 'flex', justifyContent: 'space-between', paddingLeft: '15px', paddingRight: '15px' }}>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                              <span style={{ color: '#8b8e9f', fontSize: '13px' }}>Present</span>
+                                              <strong style={{ color: '#24263d', fontSize: '15px', fontWeight: '700' }}>{attendanceStats?.presentDays || 0} {attendanceStats?.presentDays === 1 ? 'Day' : 'Days'}</strong>
+                                          </div>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                              <span style={{ color: '#8b8e9f', fontSize: '13px' }}>Average</span>
+                                              <strong style={{ color: '#24263d', fontSize: '15px', fontWeight: '700' }}>{attendanceStats?.avgHoursDisplay || '0h 00m'}</strong>
+                                          </div>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                              <span style={{ color: '#8b8e9f', fontSize: '13px' }}>Late</span>
+                                              <strong style={{ color: '#24263d', fontSize: '15px', fontWeight: '700' }}>{String(attendanceStats?.lateDays || 0).padStart(2, '0')} Day{attendanceStats?.lateDays !== 1 ? 's' : ''}</strong>
+                                          </div>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                              <span style={{ color: '#8b8e9f', fontSize: '13px' }}>Overtime</span>
+                                              <strong style={{ color: '#24263d', fontSize: '15px', fontWeight: '700' }}>{attendanceStats?.overtimeDisplay || '00h 00m'}</strong>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                      </section>
+
+                      <section className="ed-section">
+
+                        <div className="row g-4">
+
+                            
+                            <div className="col-xl-7">
+
+                                <div className="ed-celebration-panel">
+    <div className="ed-celebration-heading">
+        <div>
+            <span className="ed-card-kicker">CELEBRATIONS</span>
+            <h3>Special days this Month</h3>
+        </div>
+        <button className="ed-text-action" onClick={(e) => { e.preventDefault(); setActivePage("calendar"); }}>
+            View All
+            <i className="bi bi-arrow-up-right"></i>
+        </button>
+    </div>
+    <div className="row g-3">
+        <div className="col-md-6">
+            <div className="ed-celebration-card">
+                <div className="ed-celebration-avatar">
+                    <img src="https://i.pravatar.cc/100?img=49" alt="Employee" />
+                </div>
+                <div className="ed-celebration-content">
+                    <span className="ed-celebration-type">
+                        <i className="bi bi-balloon-heart"></i>
+                        Birthday
+                    </span>
+                    <strong>{widgetsData.upcomingBirthday ? widgetsData.upcomingBirthday.name : "No Birthdays"}</strong>
+                    <small>{widgetsData.upcomingBirthday ? new Date(widgetsData.upcomingBirthday.date).toLocaleDateString('en-GB', {day: '2-digit', month: 'long'}) : "--"}</small>
+                    <button disabled={!widgetsData.upcomingBirthday}>
+                        <i className="bi bi-send"></i>
+                        Send wishes
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div className="col-md-6">
+            <div className="ed-celebration-card">
+                <div className="ed-celebration-avatar ed-anniversary">
+                    <i className="bi bi-award"></i>
+                </div>
+                <div className="ed-celebration-content">
+                    <span className="ed-celebration-type">
+                        <i className="bi bi-stars"></i>
+                        Work Anniversary
+                    </span>
+                    <strong>{widgetsData.upcomingAnniversary ? widgetsData.upcomingAnniversary.name : "No Anniversaries"}</strong>
+                    <small>{widgetsData.upcomingAnniversary ? `${new Date(widgetsData.upcomingAnniversary.date).toLocaleDateString('en-GB', {day: '2-digit', month: 'long'})} - ${widgetsData.upcomingAnniversary.years} Years` : "--"}</small>
+                    <button disabled={!widgetsData.upcomingAnniversary}>
+                        <i className="bi bi-send"></i>
+                        Send wishes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+<div className="col-xl-5">
+<div className="ed-holiday-panel">
+    <div className="ed-holiday-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
+        <div>
+            <span className="ed-card-kicker">CALENDAR</span>
+            <h3>Next Holiday</h3>
+        </div>
+        <i className="bi bi-calendar3 ed-calendar-icon"></i>
+    </div>
+    <div className="ed-holiday-main">
+        <div className="ed-holiday-date">
+            <strong>{dashNextHoliday ? new Date(dashNextHoliday.holiday_date).toLocaleDateString('en-GB', {day: '2-digit'}) : '--'}</strong>
+            <span>{dashNextHoliday ? new Date(dashNextHoliday.holiday_date).toLocaleDateString('en-GB', {month: 'short'}).toUpperCase() : ''}</span>
+        </div>
+        <div>
+            <span>Next public holiday</span>
+            <strong>{dashNextHoliday ? dashNextHoliday.holiday_name : 'No upcoming holidays'}</strong>
+            <small>{dashNextHoliday ? new Date(dashNextHoliday.holiday_date).toLocaleDateString('en-GB', {weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'}) : ''}</small>
+        </div>
+    </div>
+    <div className="ed-holiday-footer">
+        <span>
+            {dashNextHoliday ? (
+                <>
+                    <i className="bi bi-calendar-event"></i>
+                    {Math.ceil((new Date(dashNextHoliday.holiday_date) - new Date()) / (1000 * 60 * 60 * 24))} days from now
+                </>
+            ) : null}
+        </span>
+        <button onClick={(e) => { e.preventDefault(); setActivePage("calendar"); }}>
+            View All
+            <i className="bi bi-arrow-right"></i>
+        </button>
+    </div>
+</div>
+
+                            </div>
+
+                        </div>
+
+                    </section>
+
+
+                    
+                    <section className="ed-section">
+
+                        <div className="row g-4">
+
+                            
+                            <div className="col-xl-7">
+
+                                <div className="ed-panel">
+
+                                    <div className="ed-panel-header">
+                                        <div>
+                                            <span className="ed-card-kicker">MY REQUESTS</span>
+                                            <h3>Recent requests</h3>
+                                        </div>
+
+                                        <button className="ed-text-action">
+                                            View all
+                                            <i className="bi bi-arrow-up-right"></i>
+                                        </button>
+                                    </div>
+
+                                    <div className="ed-request-list">
+                                        {recentDashboardRequests.map((req) => (
+                                            <div
+                                                className="ed-request-item"
+                                                key={req.id}
+                                            >
+                                                <div className={`ed-request-icon ${req.iconBg}`}>
+                                                    <i className={req.icon}></i>
+                                                </div>
+
+                                                <div className="ed-request-content">
+                                                    <strong>{req.title}</strong>
+                                                    <span>{req.subtitle}</span>
+                                                </div>
+
+                                                <span className={`ed-request-status ${req.statusClass}`}>
+                                                    {req.status}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+                            
+                            <div className="col-xl-5">
+
+                                <div className="ed-announcement-panel">
+
+                                    <div className="ed-announcement-top">
+                                        <div className="ed-announcement-icon">
+                                            <i className="bi bi-megaphone-fill"></i>
+                                        </div>
+
+                                        <span>HR ANNOUNCEMENT</span>
+                                    </div>
+
+                                    <h3>Quarterly Town Hall</h3>
+
+                                    <p>
+                                        Join the upcoming employee town hall to hear company
+                                        updates, achievements and what's coming next.
+                                    </p>
+
+                                    <div className="ed-announcement-meta">
+                                        <span>
+                                            <i className="bi bi-calendar3"></i>
+                                            25 Sep 2026
+                                        </span>
+
+                                        <span>
+                                            <i className="bi bi-clock"></i>
+                                            4:00 PM
+                                        </span>
+                                    </div>
+
+                                    <button>
+                                        Read announcement
+                                        <i className="bi bi-arrow-up-right"></i>
+                                    </button>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </section>
+
+                     
+                    <section className="ed-section">
+
+                        <div className="row g-4">
+
+                            
+                            <div className="col-xl-7">
+
+                                <div className="ed-panel">
+
+                                    <div className="ed-panel-header">
+                                        <div>
+                                            <span className="ed-card-kicker">MY TEAM</span>
+                                            <h3>People around you</h3>
+                                        </div>
+
+                                        <button
+                                            className="ed-text-action">
+                                            View Team
+                                            <i className="bi bi-arrow-up-right"></i>
+                                        </button>
+                                    </div>
+
+                                    <div className="ed-team-list">
+
+                                        <div className="ed-team-member">
+                                            <div className="ed-team-avatar">
+                                                <img src="https://i.pravatar.cc/100?img=47"
+                                                    alt="Priya Sharma" />
+                                                <span></span>
+                                            </div>
+
+                                            <div className="ed-team-info">
+                                                <strong>Priya Sharma</strong>
+                                                <span>Engineering Manager</span>
+                                            </div>
+
+                                            <div className="ed-team-status">
+                                                <span className="ed-status-present">Present</span>
+                                            </div>
+
+                                            <button className="ed-team-action">
+                                                <i className="bi bi-chat"></i>
+                                            </button>
+                                        </div>
+
+
+                                        <div className="ed-team-member">
+                                            <div className="ed-team-avatar">
+                                                <img src="https://i.pravatar.cc/100?img=11"
+                                                    alt="Rahul Reddy" />
+                                                <span></span>
+                                            </div>
+
+                                            <div className="ed-team-info">
+                                                <strong>Rahul Reddy</strong>
+                                                <span>Backend Developer</span>
+                                            </div>
+
+                                            <div className="ed-team-status">
+                                                <span className="ed-status-present">Present</span>
+                                            </div>
+
+                                            <button className="ed-team-action">
+                                                <i className="bi bi-chat"></i>
+                                            </button>
+                                        </div>
+
+
+                                        <div className="ed-team-member">
+                                            <div className="ed-team-avatar">
+                                                <img src="https://i.pravatar.cc/100?img=32"
+                                                    alt="Sneha Rao" />
+                                                <span className="ed-team-away"></span>
+                                            </div>
+
+                                            <div className="ed-team-info">
+                                                <strong>Sneha Rao</strong>
+                                                <span>UI/UX Designer</span>
+                                            </div>
+
+                                            <div className="ed-team-status">
+                                                <span className="ed-status-leave">On Leave</span>
+                                            </div>
+
+                                            <button className="ed-team-action">
+                                                <i className="bi bi-chat"></i>
+                                            </button>
+                                        </div>
+
+
+                                        <div className="ed-team-member">
+                                            <div className="ed-team-avatar">
+                                                <img src="https://i.pravatar.cc/100?img=68"
+                                                    alt="Vikram Singh" />
+                                                <span></span>
+                                            </div>
+
+                                            <div className="ed-team-info">
+                                                <strong>Vikram Singh</strong>
+                                                <span>Frontend Developer</span>
+                                            </div>
+
+                                            <div className="ed-team-status">
+                                                <span className="ed-status-present">Present</span>
+                                            </div>
+
+                                            <button className="ed-team-action">
+                                                <i className="bi bi-chat"></i>
+                                            </button>
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+                            
+                            <div className="col-xl-5">
+
+                                <div className="ed-panel ed-notification-panel">
+
+                                    <div className="ed-panel-header">
+                                        <div>
+                                            <span className="ed-card-kicker">UPDATES</span>
+                                            <h3>Notifications</h3>
+                                        </div>
+
+                                        <span className="ed-unread-count">3 New</span>
+                                    </div>
+
+                                    <div className="ed-notification-list">
+
+                                        <div className="ed-notification-item ed-unread">
+                                            <div className="ed-notification-icon ed-notify-purple">
+                                                <i className="bi bi-calendar-check"></i>
+                                            </div>
+
+                                            <div>
+                                                <strong>Leave approved</strong>
+                                                <p>Your leave request for 02 Oct has been approved.</p>
+                                                <small>12 minutes ago</small>
+                                            </div>
+
+                                            <span className="ed-notification-new"></span>
+                                        </div>
+
+
+                                        <div className="ed-notification-item ed-unread">
+                                            <div className="ed-notification-icon ed-notify-blue">
+                                                <i className="bi bi-megaphone"></i>
+                                            </div>
+
+                                            <div>
+                                                <strong>New HR announcement</strong>
+                                                <p>Quarterly employee town hall is scheduled for Friday.</p>
+                                                <small>2 hours ago</small>
+                                            </div>
+
+                                            <span className="ed-notification-new"></span>
+                                        </div>
+
+
+                                        <div className="ed-notification-item ed-unread">
+                                            <div className="ed-notification-icon ed-notify-orange">
+                                                <i className="bi bi-file-earmark-text"></i>
+                                            </div>
+
+                                            <div>
+                                                <strong>Document verification</strong>
+                                                <p>Your ID proof is waiting for verification.</p>
+                                                <small>Yesterday</small>
+                                            </div>
+
+                                            <span className="ed-notification-new"></span>
+                                        </div>
+
+
+                                        <div className="ed-notification-item">
+                                            <div className="ed-notification-icon ed-notify-green">
+                                                <i className="bi bi-person-check"></i>
+                                            </div>
+
+                                            <div>
+                                                <strong>Profile updated</strong>
+                                                <p>Your employment information was updated successfully.</p>
+                                                <small>2 days ago</small>
+                                            </div>
+                                        </div>
+
+                                    </div>
+
+                                    <button className="ed-view-all-btn">
+                                        View all notifications
+                                        <i className="bi bi-arrow-right"></i>
+                                    </button>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </section>
+
+
+                    
+                    <section className="ed-bottom-section">
+
+                        <div className="row g-4">
+
+                            <div className="col-xl-12">
+
+                                <div className="ed-policy-banner">
+
+                                    <div className="ed-policy-icon">
+                                        <i className="bi bi-shield-check"></i>
+                                    </div>
+
+                                    <div className="ed-policy-content">
+                                        <span>HR POLICY</span>
+                                        <h3>Know your leave policy</h3>
+                                        <p>
+                                            Review annual, sick and casual leave rules,
+                                            eligibility, carry-forward limits and approval
+                                            requirements.
+                                        </p>
+                                    </div>
+
+                                    <button>
+                                        View Policy
+                                        <i className="bi bi-arrow-right"></i>
+                                    </button>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </section>
+
+                </div>
+
+
+                
+
+                
+                <div className="modal fade" id="edLeavePolicyModal" tabIndex="-1">
+                    <div className="modal-dialog modal-dialog-centered modal-lg">
+                        <div className="modal-content ed-modal-content">
+
+                            <div className="modal-header">
+                                <div>
+                                    <span className="ed-modal-label">HR POLICY</span>
+                                    <h5 className="modal-title">Leave Policy</h5>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    className="btn-close"
+                                    data-bs-dismiss="modal">
+                                </button>
+                            </div>
+
+                            <div className="modal-body">
+
+                                <div className="ed-policy-grid">
+
+                                    <div className="ed-policy-item">
+                                        <i className="bi bi-calendar-heart"></i>
+                                        <strong>Annual Leave</strong>
+                                        <span>18 days per year</span>
+                                    </div>
+
+                                    <div className="ed-policy-item">
+                                        <i className="bi bi-heart-pulse"></i>
+                                        <strong>Sick Leave</strong>
+                                        <span>10 days per year</span>
+                                    </div>
+
+                                    <div className="ed-policy-item">
+                                        <i className="bi bi-calendar2-event"></i>
+                                        <strong>Casual Leave</strong>
+                                        <span>7 days per year</span>
+                                    </div>
+
+                                    <div className="ed-policy-item">
+                                        <i className="bi bi-arrow-repeat"></i>
+                                        <strong>Carry Forward</strong>
+                                        <span>Up to 5 annual days</span>
+                                    </div>
+
+                                </div>
+
+                                <div className="ed-policy-text">
+                                    <h6>Important Guidelines</h6>
+
+                                    <ul>
+                                        <li>Leave should be requested before the planned absence.</li>
+                                        <li>Unplanned absence should be communicated to the reporting manager.</li>
+                                        <li>Supporting documents may be required for certain leave types.</li>
+                                        <li>Leave approval depends on business and team requirements.</li>
+                                    </ul>
+                                </div>
+
+                            </div>
+
+                            <div className="modal-footer">
+                                <button
+                                    className="btn btn-light"
+                                    data-bs-dismiss="modal">
+                                    Close
+                                </button>
+
+                                <button
+                                    className="ed-modal-primary-btn">
+                                    Apply Leave
+                                    <i className="bi bi-arrow-right"></i>
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+
+                
+                <div className="ed-toast" id="edToast">
+
+                    <div className="ed-toast-icon">
+                        <i className="bi bi-check-lg"></i>
+                    </div>
+
+                    <div>
+                        <strong id="edToastTitle">Action completed</strong>
+                        <span id="edToastMessage">Your request was completed successfully.</span>
+                    </div>
+
+                    <button>
+                        <i className="bi bi-x"></i>
+                    </button>
+
+                </div>
+            </div>
+  </>
+)}
+{activePage === "employee-profile" && <EmployeeProfile />}
+{activePage === "employement-details" && <EmploymentDetails employeeProfile={employeeProfile} currentUser={currentUser} />}
+{activePage === "documents" && <Documents employeeProfile={employeeProfile} />}
+{activePage === "skills-certifications" && <SkillsCertifications employeeProfile={employeeProfile} />}
+{activePage === "attendance" && <Attendance currentUser={currentUser} employeeProfile={employeeProfile} />}
+{activePage === "leaves" && <Leaves currentUser={currentUser} employeeProfile={employeeProfile} />}
+{activePage === "assets" && <Assets employeeProfile={employeeProfile} currentUser={currentUser} />}
+{activePage === "access-accounts" && <AccessAccounts employeeProfile={employeeProfile} />}
+{activePage === "notifications" && <Notifications employeeProfile={employeeProfile} />}
+{activePage === "settings" && <Settings employeeProfile={employeeProfile} />}
+{activePage === "exit-management" && <ExitManagement employeeProfile={employeeProfile} currentUser={currentUser} />}
+{activePage === "employee-requests" && <EmployeeRequests employeeProfile={employeeProfile} currentUser={currentUser} />}
+{activePage === "calendar" && <Calendar employeeProfile={employeeProfile} currentUser={currentUser} />}
+        </div>
+    </main>
+
+    
+    {/* Commented out Bottom-Right Spark Shortcuts Menu & Spark Nav as requested
+    <button className="spark-menu" id="sparkMenu" aria-label="Open shortcuts">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+
+    <div className="spark-nav" id="sparkNav">
+        <a href="#">
+            <i className="bi bi-person-plus-fill"></i>
+            <b>Add Employee</b>
+        </a>
+        <a href="#">
+            <i className="bi bi-calendar2-check-fill"></i>
+            <b>Attendance</b>
+        </a>
+        <a href="#">
+            <i className="bi bi-wallet2"></i>
+            <b>Payroll</b>
+        </a>
+        <a href="#">
+            <i className="bi bi-file-earmark-bar-graph-fill"></i>
+            <b>Reports</b>
+        </a>
+        <a href="#">
+            <i className="bi bi-bell-fill"></i>
+            <b>Notifications</b>
+        </a>
+    </div>
+    */}
+
+    
+    <footer className="footer">
+        Copyright © 2026 Ramel Techno Solutions. All rights reserved.
+    </footer>
+
+    
+    
+
+    
+
+    
+    
+
+    <HRAssistant currentUser={currentUser} employeeProfile={employeeProfile} />
+
+    </div>
+  );
+}
+
+
