@@ -1,6 +1,275 @@
-import React from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-export default function Documents() {
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const PAGE_SIZE = 4;
+const EXPIRING_WITHIN_DAYS = 90;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const formatDate = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "ΓÇö";
+  return `${String(date.getDate()).padStart(2, "0")}-${MONTHS[date.getMonth()]}-${date.getFullYear()}`;
+};
+
+const daysUntil = (value) => (new Date(`${value}T00:00:00`) - new Date()) / 86400000;
+
+const fileKind = (doc) => {
+  const mime = doc.file_mime_type || "";
+  if (mime === "application/pdf") return { cls: "epd-pdf", icon: "bi-file-earmark-pdf", label: "PDF Document" };
+  if (mime.startsWith("image/")) return { cls: "epd-image", icon: "bi-card-image", label: "Image" };
+  return { cls: "epd-doc", icon: "bi-file-earmark-text", label: "Document" };
+};
+
+const statusKind = (status) => {
+  if (status === "Verified") return { cls: "verified", icon: "bi-check-circle-fill", label: "Verified" };
+  if (status === "Rejected") return { cls: "rejected", icon: "bi-x-circle-fill", label: "Rejected" };
+  if (status === "Re-upload") return { cls: "rejected", icon: "bi-arrow-repeat", label: "Re-upload Required" };
+  return { cls: "pending", icon: "bi-clock-fill", label: "Pending" };
+};
+const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+const EMPTY_FORM = {
+  documentCategory: "",
+  documentType: "",
+  documentName: "",
+  documentNumber: "",
+  issuedDate: "",
+  expiryDate: "",
+  remarks: "",
+};
+
+export default function Documents({ currentUser }) {
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [fileError, setFileError] = useState("");
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState({ type: "", text: "" });
+  const fileInputRef = useRef(null);
+  const [documents, setDocuments] = useState([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState("");
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [viewDoc, setViewDoc] = useState(null);
+  const [editingDoc, setEditingDoc] = useState(null);
+  const [actionError, setActionError] = useState("");
+
+  const openEdit = (doc) => {
+    setEditingDoc(doc);
+    setForm({
+      documentCategory: doc.document_category || "",
+      documentType: doc.document_type || "",
+      documentName: doc.document_name || "",
+      documentNumber: doc.document_number || "",
+      issuedDate: doc.issued_date || "",
+      expiryDate: doc.expiry_date || "",
+      remarks: doc.remarks || "",
+    });
+    setFeedback({ type: "", text: "" });
+    setIsUploadOpen(true);
+  };
+
+  const deleteDocument = async (doc) => {
+    if (!window.confirm(`Delete "${doc.document_name || doc.document_type}"? This cannot be undone.`)) return;
+    try {
+      setActionError("");
+      const response = await fetch(`${API_BASE}/api/employee/documents/${currentUser.id}/${doc.id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Delete failed");
+      loadDocuments();
+    } catch (err) {
+      setActionError(err.message || "Delete failed");
+      loadDocuments();
+    }
+  };
+
+  const loadDocuments = useCallback(async () => {
+    if (!currentUser?.id) {
+      setListLoading(false);
+      return;
+    }
+    try {
+      setListError("");
+      const response = await fetch(`${API_BASE}/api/employee/documents/${currentUser.id}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Failed to load documents");
+      setDocuments(data);
+    } catch (err) {
+      setListError(err.message || "Failed to load documents");
+    } finally {
+      setListLoading(false);
+    }
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
+
+  const filteredDocuments = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return documents.filter((doc) => {
+      if (categoryFilter && doc.document_category !== categoryFilter) return false;
+      if (statusFilter && doc.verification_status !== statusFilter) return false;
+      if (!term) return true;
+      return [doc.document_name, doc.document_type, doc.document_number, doc.file_name]
+        .some((value) => (value || "").toLowerCase().includes(term));
+    });
+  }, [documents, search, categoryFilter, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pagedDocuments = filteredDocuments.slice(pageStart, pageStart + PAGE_SIZE);
+
+  const pendingCount = documents.filter((d) => !d.verification_status || d.verification_status === "Pending").length;
+  const verifiedCount = documents.filter((d) => d.verification_status === "Verified").length;
+  const expiringCount = documents.filter((d) => {
+    if (!d.expiry_date) return false;
+    const days = daysUntil(d.expiry_date);
+    return days <= EXPIRING_WITHIN_DAYS;
+  }).length;
+
+  const tableRows = pagedDocuments.map((doc) => {
+    const kind = fileKind(doc);
+    const status = statusKind(doc.verification_status);
+    const expiring = doc.expiry_date && daysUntil(doc.expiry_date) <= EXPIRING_WITHIN_DAYS;
+    return (
+      <tr key={doc.id}>
+        <td>
+          <div className="epd-document-name">
+            <div className={`epd-file-icon ${kind.cls}`}>
+              <i className={`bi ${kind.icon}`}></i>
+            </div>
+            <div>
+              <strong>{doc.document_name || doc.document_type}</strong>
+              <span>{kind.label}</span>
+            </div>
+          </div>
+        </td>
+        <td>
+          <span className="epd-type-badge">{doc.document_category}</span>
+        </td>
+        <td>
+          <div className="epd-date">
+            <strong>{formatDate(doc.created_at)}</strong>
+            <span>Uploaded</span>
+          </div>
+        </td>
+        <td>
+          <span className={`epd-status ${status.cls}`}>
+            <i className={`bi ${status.icon}`}></i>
+            {status.label}
+          </span>
+        </td>
+        <td>
+          <span className={expiring ? "epd-expiry epd-expiry-warning" : "epd-expiry"}>
+            {doc.expiry_date ? formatDate(`${doc.expiry_date}T00:00:00`) : "ΓÇö"}
+          </span>
+        </td>
+        <td>
+          <div className="epd-actions">
+            <button type="button" className="epd-view-btn" title="View details" onClick={() => setViewDoc(doc)}>
+              <i className="bi bi-eye"></i>
+            </button>
+            {doc.verification_status !== "Verified" && (
+              <>
+                <button type="button" className="epd-edit-btn" title="Edit" onClick={() => openEdit(doc)}>
+                  <i className="bi bi-pencil"></i>
+                </button>
+                <button type="button" className="epd-delete-btn" title="Delete" onClick={() => deleteDocument(doc)}>
+                  <i className="bi bi-trash"></i>
+                </button>
+              </>
+            )}
+          </div>
+        </td>
+      </tr>
+    );
+  });
+  const updateField = (event) => {
+    const { name, value } = event.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const closeUpload = () => {
+    setIsUploadOpen(false);
+    setEditingDoc(null);
+    setSelectedFile(null);
+    setFileError("");
+    setForm(EMPTY_FORM);
+    setFeedback({ type: "", text: "" });
+  };
+
+  const submitUpload = async () => {
+    if (!form.documentCategory || !form.documentType) {
+      setFeedback({ type: "danger", text: "Document category and type are required." });
+      return;
+    }
+
+    if (editingDoc) {
+      try {
+        setSubmitting(true);
+        setFeedback({ type: "", text: "" });
+        const editBody = new FormData();
+        Object.entries(form).forEach(([key, value]) => editBody.append(key, value));
+        if (selectedFile) editBody.append("file", selectedFile);
+        const response = await fetch(`${API_BASE}/api/employee/documents/${currentUser.id}/${editingDoc.id}`, {
+          method: "PATCH",
+          body: editBody,
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "Update failed");
+        loadDocuments();
+        closeUpload();
+      } catch (err) {
+        setFeedback({ type: "danger", text: err.message || "Update failed" });
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    if (!selectedFile) {
+      setFeedback({ type: "danger", text: "Please choose a file to upload." });
+      return;
+    }
+
+    const body = new FormData();
+    body.append("file", selectedFile);
+    Object.entries(form).forEach(([key, value]) => body.append(key, value));
+
+    try {
+      setSubmitting(true);
+      setFeedback({ type: "", text: "" });
+      const response = await fetch(`${API_BASE}/api/employee/documents/${currentUser.id}`, {
+        method: "POST",
+        body,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Upload failed");
+      setFeedback({ type: "success", text: data.message });
+      setSelectedFile(null);
+      setForm(EMPTY_FORM);
+      loadDocuments();
+    } catch (err) {
+      setFeedback({ type: "danger", text: err.message || "Upload failed" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const pickFile = (file) => {
+    if (!file) return;
+    if (file.size > MAX_FILE_SIZE) {
+      setFileError("File size must be 10 MB or less.");
+      return;
+    }
+    setFileError("");
+    setSelectedFile(file);
+  };
+
   return (
     <>
 <div className="px-0 px-md-5 employee-dashboard">
@@ -20,7 +289,7 @@ export default function Documents() {
                                 </p>
                             </div>
 
-                            <button type="button" className="epd-upload-btn" id="epdHeaderUploadBtn">
+                            <button type="button" className="epd-upload-btn" id="epdHeaderUploadBtn" onClick={() => setIsUploadOpen(true)}>
 
                                 <i className="bi bi-cloud-arrow-up"></i>
 
@@ -71,7 +340,7 @@ export default function Documents() {
                             </div>
 
                             <div className="esc-employee-side">
-                                <span className="esc-side-label">8</span>
+                                <span className="esc-side-label">{documents.length}</span>
                                 <strong>Total Documents</strong>
                             </div>
 
@@ -91,7 +360,7 @@ export default function Documents() {
 
                                     <div>
                                         <span>Total Documents</span>
-                                        <strong id="escTotalSkills">8</strong>
+                                        <strong id="escTotalSkills">{documents.length}</strong>
                                         <small>Across all categories</small>
                                     </div>
                                 </div>
@@ -105,8 +374,8 @@ export default function Documents() {
 
                                     <div>
                                         <span>Pending Documents</span>
-                                        <strong id="escAdvancedSkills">5</strong>
-                                        <small>High proficiency</small>
+                                        <strong id="escAdvancedSkills">{pendingCount}</strong>
+                                        <small>Awaiting verification</small>
                                     </div>
                                 </div>
                             </div>
@@ -119,7 +388,7 @@ export default function Documents() {
 
                                     <div>
                                         <span>Verified Documents</span>
-                                        <strong id="escVerifiedSkills">6</strong>
+                                        <strong id="escVerifiedSkills">{verifiedCount}</strong>
                                         <small>Verified by HR</small>
                                     </div>
                                 </div>
@@ -133,8 +402,8 @@ export default function Documents() {
 
                                     <div>
                                         <span>Expiring Documents</span>
-                                        <strong id="escCertificationCount">3</strong>
-                                        <small>Active credentials</small>
+                                        <strong id="escCertificationCount">{expiringCount}</strong>
+                                        <small>Within 90 days</small>
                                     </div>
                                 </div>
                             </div>
@@ -156,35 +425,37 @@ export default function Documents() {
                                 </div>
 
                                 <span className="epd-list-count">
-                                    8 Documents
+                                    {documents.length} Documents
                                 </span>
 
                             </div>
 
 
                             
+                            {actionError && <p className="text-danger small px-3 mb-2">{actionError}</p>}
+
                             <div className="epd-toolbar">
 
                                 <div className="epd-search">
 
                                     <i className="bi bi-search"></i>
 
-                                    <input type="text" id="epdSearch" placeholder="Search documents..." />
+                                    <input type="text" id="epdSearch" placeholder="Search documents..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
 
                                 </div>
 
 
-                                <select id="epdTypeFilter" className="epd-filter">
+                                <select id="epdTypeFilter" className="epd-filter" value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}>
                                     <option value="">All Types</option>
-                                    <option value="Employment">Employment</option>
-                                    <option value="Legal">Legal</option>
                                     <option value="Identity">Identity</option>
-                                    <option value="Technical">Technical</option>
+                                    <option value="Employment">Employment</option>
                                     <option value="Education">Education</option>
-                                    <option value="Experience">Experience</option>
+                                    <option value="Bank">Bank</option>
+                                    <option value="Tax">Tax</option>
+                                    <option value="Compliance">Compliance</option>
                                 </select>
 
-                                <select id="epdStatusFilter" className="epd-filter">
+                                <select id="epdStatusFilter" className="epd-filter" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
                                     <option value="">All Status</option>
                                     <option value="Verified">Verified</option>
                                     <option value="Pending">Pending</option>
@@ -222,337 +493,7 @@ export default function Documents() {
                                     </thead>
 
                                     <tbody id="epdDocumentTableBody">
-
-
-                                        
-                                        <tr data-document="Offer Letter" data-type="Employment" data-status="Verified">
-
-                                            <td>
-
-                                                <div className="epd-document-name">
-
-                                                    <div className="epd-file-icon epd-pdf">
-                                                        <i className="bi bi-file-earmark-pdf"></i>
-                                                    </div>
-
-                                                    <div>
-                                                        <strong>
-                                                            Offer Letter
-                                                        </strong>
-
-                                                        <span>
-                                                            PDF Document
-                                                        </span>
-                                                    </div>
-
-                                                </div>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <span className="epd-type-badge">
-                                                    Employment
-                                                </span>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <div className="epd-date">
-
-                                                    <strong>10-Jan-2026</strong>
-
-                                                    <span>Uploaded</span>
-
-                                                </div>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <span className="epd-status verified">
-
-                                                    <i className="bi bi-check-circle-fill"></i>
-
-                                                    Verified
-
-                                                </span>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <span className="epd-expiry">
-                                                    —
-                                                </span>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <button type="button" className="epd-view-btn">
-
-                                                    <i className="bi bi-eye"></i>
-
-                                                </button>
-
-                                            </td>
-
-                                        </tr>
-
-
-                                        
-                                        <tr data-document="NDA" data-type="Legal" data-status="Verified">
-
-                                            <td>
-
-                                                <div className="epd-document-name">
-
-                                                    <div className="epd-file-icon epd-doc">
-                                                        <i className="bi bi-file-earmark-text"></i>
-                                                    </div>
-
-                                                    <div>
-                                                        <strong>NDA</strong>
-
-                                                        <span>
-                                                            Legal Document
-                                                        </span>
-                                                    </div>
-
-                                                </div>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <span className="epd-type-badge">
-                                                    Legal
-                                                </span>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <div className="epd-date">
-
-                                                    <strong>10-Jan-2026</strong>
-
-                                                    <span>Uploaded</span>
-
-                                                </div>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <span className="epd-status verified">
-
-                                                    <i className="bi bi-check-circle-fill"></i>
-
-                                                    Verified
-
-                                                </span>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <span className="epd-expiry">
-                                                    —
-                                                </span>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <button type="button" className="epd-view-btn">
-
-                                                    <i className="bi bi-eye"></i>
-
-                                                </button>
-
-                                            </td>
-
-                                        </tr>
-
-
-                                        
-                                        <tr data-document="ID Proof" data-type="Identity" data-status="Pending">
-
-                                            <td>
-
-                                                <div className="epd-document-name">
-
-                                                    <div className="epd-file-icon epd-image">
-                                                        <i className="bi bi-card-image"></i>
-                                                    </div>
-
-                                                    <div>
-                                                        <strong>
-                                                            ID Proof
-                                                        </strong>
-
-                                                        <span>
-                                                            Identity Document
-                                                        </span>
-                                                    </div>
-
-                                                </div>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <span className="epd-type-badge">
-                                                    Identity
-                                                </span>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <div className="epd-date">
-
-                                                    <strong>11-Jan-2026</strong>
-
-                                                    <span>Uploaded</span>
-
-                                                </div>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <span className="epd-status pending">
-
-                                                    <i className="bi bi-clock-fill"></i>
-
-                                                    Pending
-
-                                                </span>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <span className="epd-expiry">
-                                                    —
-                                                </span>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <button type="button" className="epd-review-btn">
-
-                                                    <i className="bi bi-shield-check"></i>
-
-                                                </button>
-
-                                            </td>
-
-                                        </tr>
-
-
-                                        
-                                        <tr data-document="Certification" data-type="Technical" data-status="Verified">
-
-                                            <td>
-
-                                                <div className="epd-document-name">
-
-                                                    <div className="epd-file-icon epd-cert">
-                                                        <i className="bi bi-award"></i>
-                                                    </div>
-
-                                                    <div>
-                                                        <strong>
-                                                            Certification
-                                                        </strong>
-
-                                                        <span>
-                                                            Technical Document
-                                                        </span>
-                                                    </div>
-
-                                                </div>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <span className="epd-type-badge">
-                                                    Technical
-                                                </span>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <div className="epd-date">
-
-                                                    <strong>12-Jan-2026</strong>
-
-                                                    <span>Uploaded</span>
-
-                                                </div>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <span className="epd-status verified">
-
-                                                    <i className="bi bi-check-circle-fill"></i>
-
-                                                    Verified
-
-                                                </span>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <span className="epd-expiry epd-expiry-warning">
-                                                    2027
-                                                </span>
-
-                                            </td>
-
-
-                                            <td>
-
-                                                <button type="button" className="epd-view-btn">
-
-                                                    <i className="bi bi-eye"></i>
-
-                                                </button>
-
-                                            </td>
-
-                                        </tr>
-
+                                        {tableRows}
                                     </tbody>
 
                                 </table>
@@ -561,16 +502,16 @@ export default function Documents() {
 
 
                             
-                            <div id="epdNoResults" className="epd-no-results d-none">
+                            <div id="epdNoResults" className={`epd-no-results${!listLoading && filteredDocuments.length === 0 ? "" : " d-none"}`}>
 
                                 <div>
                                     <i className="bi bi-file-earmark-x"></i>
                                 </div>
 
-                                <h6>No documents found</h6>
+                                <h6>{listError || "No documents found"}</h6>
 
                                 <p>
-                                    Try changing your search or filter.
+                                    {listError ? "Please try again later." : "Try changing your search or filter."}
                                 </p>
 
                             </div>
@@ -580,25 +521,23 @@ export default function Documents() {
                             <div className="epd-table-footer">
 
                                 <span>
-                                    Showing <strong>1–4</strong> of
-                                    <strong>8</strong> documents
+                                    Showing <strong>{filteredDocuments.length ? `${pageStart + 1}ΓÇô${pageStart + pagedDocuments.length}` : 0}</strong> of{" "}
+                                    <strong>{filteredDocuments.length}</strong> documents
                                 </span>
 
                                 <div className="epd-pagination">
 
-                                    <button disabled>
+                                    <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>
                                         <i className="bi bi-chevron-left"></i>
                                     </button>
 
-                                    <button className="active">
-                                        1
-                                    </button>
+                                    {Array.from({ length: totalPages }, (_, index) => index + 1).map((number) => (
+                                        <button type="button" key={number} className={number === currentPage ? "active" : ""} onClick={() => setPage(number)}>
+                                            {number}
+                                        </button>
+                                    ))}
 
-                                    <button>
-                                        2
-                                    </button>
-
-                                    <button>
+                                    <button type="button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>
                                         <i className="bi bi-chevron-right"></i>
                                     </button>
 
@@ -642,9 +581,87 @@ export default function Documents() {
 
 
                     
-                    <div className="modal fade" id="epdUploadModal" tabIndex="-1" aria-hidden="true">
+                    {viewDoc && <div className="modal-backdrop fade show" onClick={() => setViewDoc(null)}></div>}
 
-                        <div className="modal-dialog modal-dialog-centered modal-lg">
+                    <div
+                        className={`modal fade${viewDoc ? " show d-block" : ""}`}
+                        id="epdViewModal"
+                        tabIndex="-1"
+                        aria-hidden={!viewDoc}
+                        onClick={(event) => {
+                            if (event.target === event.currentTarget) setViewDoc(null);
+                        }}
+                    >
+                        <div className="modal-dialog modal-dialog-centered">
+                            <div className="modal-content epd-modal">
+                                <div className="modal-header">
+                                    <div>
+                                        <span className="epd-modal-label">Employee Documents</span>
+                                        <h5 className="modal-title">Document Details</h5>
+                                    </div>
+                                    <button type="button" className="btn-close" aria-label="Close" onClick={() => setViewDoc(null)}></button>
+                                </div>
+
+                                {viewDoc && (
+                                    <div className="modal-body">
+                                        <div className="epd-detail-head">
+                                            <div className={`epd-file-icon ${fileKind(viewDoc).cls}`}>
+                                                <i className={`bi ${fileKind(viewDoc).icon}`}></i>
+                                            </div>
+                                            <div>
+                                                <strong>{viewDoc.document_name || viewDoc.document_type}</strong>
+                                                <span>{viewDoc.file_name} ┬╖ {fileKind(viewDoc).label}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="row g-3 epd-detail-grid">
+                                            {[
+                                                ["Document Category", viewDoc.document_category],
+                                                ["Document Type", viewDoc.document_type],
+                                                ["Document Name", viewDoc.document_name],
+                                                ["Document Number", viewDoc.document_number],
+                                                ["Issued Date", viewDoc.issued_date ? formatDate(`${viewDoc.issued_date}T00:00:00`) : ""],
+                                                ["Expiry Date", viewDoc.expiry_date ? formatDate(`${viewDoc.expiry_date}T00:00:00`) : ""],
+                                            ].map(([label, value]) => (
+                                                <div className="col-6" key={label}>
+                                                    <span>{label}</span>
+                                                    <strong>{value || "ΓÇö"}</strong>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="modal-footer">
+                                    {viewDoc && (
+                                        <a
+                                            className="epd-modal-save text-decoration-none"
+                                            href={`${API_BASE}/uploads/documents/${encodeURIComponent(viewDoc.file_path)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            <i className="bi bi-box-arrow-up-right"></i> Open File
+                                        </a>
+                                    )}
+                                    <button type="button" className="epd-modal-cancel" onClick={() => setViewDoc(null)}>Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {isUploadOpen && <div className="modal-backdrop fade show" onClick={closeUpload}></div>}
+
+                    <div
+                        className={`modal fade${isUploadOpen ? " show d-block" : ""}`}
+                        id="epdUploadModal"
+                        tabIndex="-1"
+                        aria-hidden={!isUploadOpen}
+                        onClick={(event) => {
+                            if (event.target === event.currentTarget) closeUpload();
+                        }}
+                    >
+
+                        <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
 
                             <div className="modal-content epd-modal">
 
@@ -657,12 +674,12 @@ export default function Documents() {
                                         </span>
 
                                         <h5 className="modal-title">
-                                            Upload Document
+                                            {editingDoc ? "Edit Document" : "Upload Document"}
                                         </h5>
 
                                     </div>
 
-                                    <button type="button" className="btn-close" data-bs-dismiss="modal">
+                                    <button type="button" className="btn-close" aria-label="Close" onClick={closeUpload}>
                                     </button>
 
                                 </div>
@@ -670,9 +687,29 @@ export default function Documents() {
 
                                 <div className="modal-body">
 
-                                    <div className="epd-upload-zone" id="epdUploadZone">
+                                    <div
+                                        className="epd-upload-zone"
+                                        id="epdUploadZone"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        onDragOver={(event) => event.preventDefault()}
+                                        onDrop={(event) => {
+                                            event.preventDefault();
+                                            pickFile(event.dataTransfer.files[0]);
+                                        }}
+                                    >
 
-                                        <input type="file" id="epdFileInput" hidden />
+                                        <input
+                                            type="file"
+                                            id="epdFileInput"
+                                            ref={fileInputRef}
+                                            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                            hidden
+                                            onClick={(event) => event.stopPropagation()}
+                                            onChange={(event) => {
+                                                pickFile(event.target.files[0]);
+                                                event.target.value = "";
+                                            }}
+                                        />
 
                                         <div className="epd-upload-icon">
 
@@ -689,28 +726,36 @@ export default function Documents() {
                                         </span>
 
                                         <small>
-                                            PDF, JPG, PNG, DOC, DOCX · Maximum 10 MB
+                                            PDF, JPG, PNG, DOC, DOCX ┬╖ Maximum 10 MB
                                         </small>
 
                                     </div>
 
-                                    <div id="epdSelectedFile" className="epd-selected-file d-none">
+                                    {fileError && <p className="text-danger small mt-2">{fileError}</p>}
+
+                                    {editingDoc && !selectedFile && (
+                                        <p className="small text-muted mt-2 mb-0">
+                                            Current file: {editingDoc.file_name}. Choose a new file only if you want to replace it.
+                                        </p>
+                                    )}
+
+                                    <div id="epdSelectedFile" className={`epd-selected-file${selectedFile ? "" : " d-none"}`}>
 
                                         <i className="bi bi-file-earmark-text"></i>
 
                                         <div>
 
                                             <strong id="epdFileName">
-                                                Document.pdf
+                                                {selectedFile?.name}
                                             </strong>
 
                                             <span id="epdFileSize">
-                                                0 KB
+                                                {selectedFile ? `${Math.max(1, Math.round(selectedFile.size / 1024))} KB` : ""}
                                             </span>
 
                                         </div>
 
-                                        <button type="button" id="epdRemoveFile">
+                                        <button type="button" id="epdRemoveFile" onClick={() => setSelectedFile(null)}>
 
                                             <i className="bi bi-x-lg"></i>
 
@@ -748,11 +793,7 @@ export default function Documents() {
                                                     <span>*</span>
                                                 </label>
 
-                                                <select className="form-select epd-input" id="epdDocumentType">
-
-                                                    <option value="">
-                                                        Select Document Type
-                                                    </option>
+                                                <select className="form-select epd-input" id="epdDocumentCategory" name="documentCategory" value={form.documentCategory} onChange={updateField}>
 
                                                     <option>Identity</option>
 
@@ -781,7 +822,7 @@ export default function Documents() {
                                                     <span>*</span>
                                                 </label>
 
-                                                <select className="form-select epd-input" id="epdDocumentType">
+                                                <select className="form-select epd-input" id="epdDocumentType" name="documentType" value={form.documentType} onChange={updateField}>
 
                                                     <option value="">
                                                         Select Document Type
@@ -855,7 +896,7 @@ export default function Documents() {
 
                                                 <div className="">
 
-                                                    <input type="text" className="form-control epd-input" id="epdVerifiedBy"
+                                                    <input type="text" className="form-control epd-input" id="epdDocumentName" name="documentName" value={form.documentName} onChange={updateField}
                                                         placeholder="Actual name/title of the document" />
 
                                                 </div>
@@ -871,7 +912,7 @@ export default function Documents() {
 
                                                 <div className="">
 
-                                                    <input type="text" className="form-control epd-input" id="epdVerifiedBy"
+                                                    <input type="text" className="form-control epd-input" id="epdDocumentNumber" name="documentNumber" value={form.documentNumber} onChange={updateField}
                                                         placeholder="Document Number" />
 
                                                 </div>
@@ -890,7 +931,7 @@ export default function Documents() {
 
                                                     <i className="bi bi-calendar3"></i>
 
-                                                    <input type="date" className="form-control epd-input" id="epdVerificationDate" />
+                                                    <input type="date" className="form-control epd-input" id="epdIssuedDate" name="issuedDate" value={form.issuedDate} onChange={updateField} />
 
                                                 </div>
 
@@ -907,7 +948,7 @@ export default function Documents() {
 
                                                     <i className="bi bi-calendar3"></i>
 
-                                                    <input type="date" className="form-control epd-input" id="epdVerificationDate" />
+                                                    <input type="date" className="form-control epd-input" id="epdExpiryDate" name="expiryDate" value={form.expiryDate} onChange={updateField} />
 
                                                 </div>
 
@@ -921,7 +962,7 @@ export default function Documents() {
                                                     Remarks
                                                 </label>
 
-                                                <textarea className="form-control epd-input epd-textarea" id="epdRemarks" rows="4"
+                                                <textarea className="form-control epd-input epd-textarea" id="epdRemarks" rows="4" name="remarks" value={form.remarks} onChange={updateField}
                                                     placeholder="Add remarks or verification notes..."></textarea>
 
                                             </div>
@@ -935,17 +976,19 @@ export default function Documents() {
 
                                 <div className="modal-footer">
 
-                                    <button type="button" className="epd-modal-cancel" data-bs-dismiss="modal">
+                                    {feedback.text && <span className={`me-auto small text-${feedback.type}`}>{feedback.text}</span>}
+
+                                    <button type="button" className="epd-modal-cancel" onClick={closeUpload}>
 
                                         Cancel
 
                                     </button>
 
-                                    <button type="button" className="epd-modal-save" id="epdUploadConfirm">
+                                    <button type="button" className="epd-modal-save" id="epdUploadConfirm" onClick={submitUpload} disabled={submitting}>
 
-                                        <i className="bi bi-cloud-arrow-up"></i>
+                                        <i className={`bi ${editingDoc ? "bi-check-lg" : "bi-cloud-arrow-up"}`}></i>
 
-                                        Upload Document
+                                        {submitting ? (editingDoc ? "Saving..." : "Uploading...") : (editingDoc ? "Save Changes" : "Upload Document")}
 
                                     </button>
 

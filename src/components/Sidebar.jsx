@@ -2,18 +2,18 @@ import React from 'react';
 
 export default function Sidebar({ isOpen, toggleSidebar, activeMenu, setActiveMenu }) {
   const menus = [
-    { name: 'Employee Dashboard', icon: 'bi-grid' },
-    { name: 'Employee Profile', icon: 'bi-person' },
-    { name: 'Employment Details', icon: 'bi-briefcase' },
-    { name: 'Documents', icon: 'bi-file-earmark-text' },
-    { name: 'Skills & Certifications', icon: 'bi-award' },
-    { name: 'Attendance', icon: 'bi-clock' },
-    { name: 'Leave', icon: 'bi-calendar' },
-    { name: 'Assets', icon: 'bi-laptop' },
-    { name: 'Access & Accounts', icon: 'bi-shield-lock' },
-    { name: 'Notifications', icon: 'bi-bell' },
-    { name: 'Settings', icon: 'bi-gear' },
-    { name: 'Resignation & Exit', icon: 'bi-box-arrow-right' },
+    { name: 'Employee Dashboard', icon: 'bi-grid', page: 'index' },
+    { name: 'Employee Profile', icon: 'bi-person', page: 'employee-profile' },
+    { name: 'Employment Details', icon: 'bi-briefcase', page: 'employement-details' },
+    { name: 'Documents', icon: 'bi-file-earmark-text', page: 'documents' },
+    { name: 'Skills & Certifications', icon: 'bi-award', page: 'skills-certifications' },
+    { name: 'Attendance', icon: 'bi-clock', page: 'attendance' },
+    { name: 'Leave', icon: 'bi-calendar', page: 'leaves' },
+    { name: 'Assets', icon: 'bi-laptop', page: 'assets' },
+    { name: 'Access & Accounts', icon: 'bi-shield-lock', page: 'access-accounts' },
+    { name: 'Notifications', icon: 'bi-bell', page: 'notifications' },
+    { name: 'Settings', icon: 'bi-gear', page: 'settings' },
+    { name: 'Resignation & Exit', icon: 'bi-box-arrow-right', page: 'exit-management' },
   ];
 
   return (
@@ -30,8 +30,8 @@ export default function Sidebar({ isOpen, toggleSidebar, activeMenu, setActiveMe
           {menus.map((menu, idx) => (
             <li className="nav-item" key={idx}>
               <button 
-                className={`nav-link text-start w-100 btn ${activeMenu === menu.name ? 'btn-primary-subtle text-primary fw-bold' : 'btn-light text-dark'}`}
-                onClick={() => { setActiveMenu(menu.name); if(window.innerWidth < 768) toggleSidebar(); }}
+                className={`nav-link text-start w-100 btn ${activeMenu === menu.page ? 'btn-primary-subtle text-primary fw-bold' : 'btn-light text-dark'}`}
+                onClick={() => { setActiveMenu(menu.page); if(window.innerWidth < 768) toggleSidebar(); }}
               >
                 <i className={`bi ${menu.icon} me-2`}></i> {menu.name}
               </button>

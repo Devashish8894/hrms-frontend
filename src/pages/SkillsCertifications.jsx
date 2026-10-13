@@ -1,6 +1,318 @@
-import React from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-export default function SkillsCertifications() {
+const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+
+const CATEGORY_STYLE = {
+  Programming: { avatar: "esc-java", icon: "bi-code-slash" },
+  Framework: { avatar: "esc-spring", icon: "bi-boxes" },
+  Cloud: { avatar: "esc-aws", icon: "bi-cloud" },
+  Database: { avatar: "esc-postgresql", icon: "bi-database" },
+  DevOps: { avatar: "esc-aws", icon: "bi-gear" },
+  Testing: { avatar: "esc-spring", icon: "bi-bug" },
+  "UI/UX": { avatar: "esc-java", icon: "bi-palette" },
+  "Project Management": { avatar: "esc-postgresql", icon: "bi-kanban" },
+  "Soft Skills": { avatar: "esc-spring", icon: "bi-people" },
+  "Domain Knowledge": { avatar: "esc-aws", icon: "bi-book" },
+  Others: { avatar: "esc-postgresql", icon: "bi-lightning-charge" },
+};
+const LEVEL_WIDTH = { Beginner: 25, Intermediate: 60, Advanced: 85, Expert: 100 };
+const MAX_CERT_FILE_SIZE = 10 * 1024 * 1024;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const CERT_LOGO_CLASSES = ["", "esc-cert-green", "esc-cert-orange"];
+
+const formatCertDate = (value) => {
+  if (!value) return "ΓÇö";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "ΓÇö";
+  return `${String(date.getDate()).padStart(2, "0")}-${MONTHS[date.getMonth()]}-${date.getFullYear()}`;
+};
+const EMPTY_CERT_FORM = {
+  skillCategory: "",
+  certificationName: "",
+  issuingOrganization: "",
+  certificateNumber: "",
+  issueDate: "",
+  expiryDate: "",
+};
+const EMPTY_SKILL_FORM = {
+  skillName: "",
+  skillCategory: "",
+  otherSkill: "",
+  proficiency: "Beginner",
+  yearsOfExperience: "",
+  lastUsed: "",
+};
+
+export default function SkillsCertifications({ currentUser }) {
+  const [isCertOpen, setIsCertOpen] = useState(false);
+  const [certForm, setCertForm] = useState(EMPTY_CERT_FORM);
+  const [certFile, setCertFile] = useState(null);
+  const [certSubmitting, setCertSubmitting] = useState(false);
+  const [certFeedback, setCertFeedback] = useState({ type: "", text: "" });
+  const [certs, setCerts] = useState([]);
+  const [certsLoading, setCertsLoading] = useState(true);
+  const [certsError, setCertsError] = useState("");
+
+  const loadCerts = useCallback(async () => {
+    if (!currentUser?.id) {
+      setCertsLoading(false);
+      return;
+    }
+    try {
+      setCertsError("");
+      const response = await fetch(`${API_BASE}/api/employee/certifications/${currentUser.id}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Failed to load certifications");
+      setCerts(data);
+    } catch (err) {
+      setCertsError(err.message || "Failed to load certifications");
+    } finally {
+      setCertsLoading(false);
+    }
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    loadCerts();
+  }, [loadCerts]);
+
+  const certCards = certs.map((cert, index) => {
+    const style = CATEGORY_STYLE[cert.skill_category] || CATEGORY_STYLE.Others;
+    const verified = cert.verification_status === "Verified";
+    return (
+      <div className="col-xl-4 col-lg-6" key={cert.id}>
+        <div className="esc-cert-card">
+          <div className="esc-cert-top">
+            <div className={`esc-cert-logo ${CERT_LOGO_CLASSES[index % CERT_LOGO_CLASSES.length]}`}>
+              <i className={`bi ${style.icon}`}></i>
+            </div>
+          </div>
+
+          <div className="esc-cert-content">
+            <span className="esc-cert-category">{cert.skill_category}</span>
+            <h4>{cert.certification_name}</h4>
+            <p className="esc-cert-org">{cert.issuing_organization || "ΓÇö"}</p>
+
+            <div className="esc-cert-info">
+              <div>
+                <span>Certificate Number</span>
+                <strong>{cert.certificate_number || "ΓÇö"}</strong>
+              </div>
+              <div>
+                <span>Issue Date</span>
+                <strong>{formatCertDate(cert.issue_date)}</strong>
+              </div>
+              <div>
+                <span>Expiry Date</span>
+                <strong>{formatCertDate(cert.expiry_date)}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="esc-cert-footer">
+            <span className="esc-cert-verified" style={verified ? undefined : { color: "#f59a42" }}>
+              <i className={`bi ${verified ? "bi-patch-check-fill" : "bi-clock-fill"}`}></i>
+              {verified ? "Verified" : "Pending"}
+            </span>
+
+            {cert.file_path && (
+              <a
+                className="btn esc-cert-view-btn"
+                href={`${API_BASE}/uploads/certifications/${encodeURIComponent(cert.file_path)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View Certificate
+                <i className="bi bi-arrow-up-right"></i>
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  });
+
+  const updateCertField = (event) => {
+    const { name, value } = event.target;
+    setCertForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const closeCert = () => {
+    setIsCertOpen(false);
+    setCertForm(EMPTY_CERT_FORM);
+    setCertFile(null);
+    setCertFeedback({ type: "", text: "" });
+  };
+
+  const pickCertFile = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > MAX_CERT_FILE_SIZE) {
+      setCertFeedback({ type: "danger", text: "File size must be 10 MB or less." });
+      event.target.value = "";
+      return;
+    }
+    setCertFeedback({ type: "", text: "" });
+    setCertFile(file);
+  };
+
+  const saveCertification = async () => {
+    if (!certForm.skillCategory || !certForm.certificationName.trim()) {
+      setCertFeedback({ type: "danger", text: "Skill category and certification name are required." });
+      return;
+    }
+
+    const body = new FormData();
+    Object.entries(certForm).forEach(([key, value]) => body.append(key, value));
+    if (certFile) body.append("file", certFile);
+
+    try {
+      setCertSubmitting(true);
+      setCertFeedback({ type: "", text: "" });
+      const response = await fetch(`${API_BASE}/api/employee/certifications/${currentUser.id}`, {
+        method: "POST",
+        body,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Failed to save certification");
+      setCertForm(EMPTY_CERT_FORM);
+      setCertFile(null);
+      setCertFeedback({ type: "success", text: data.message });
+      loadCerts();
+    } catch (err) {
+      setCertFeedback({ type: "danger", text: err.message || "Failed to save certification" });
+    } finally {
+      setCertSubmitting(false);
+    }
+  };
+  const [isSkillOpen, setIsSkillOpen] = useState(false);
+  const [skillForm, setSkillForm] = useState(EMPTY_SKILL_FORM);
+  const [skillSubmitting, setSkillSubmitting] = useState(false);
+  const [skillFeedback, setSkillFeedback] = useState({ type: "", text: "" });
+  const skillCategory = skillForm.skillCategory;
+  const [skills, setSkills] = useState([]);
+  const [skillsLoading, setSkillsLoading] = useState(true);
+  const [skillsError, setSkillsError] = useState("");
+  const [skillSearch, setSkillSearch] = useState("");
+  const [skillCategoryFilter, setSkillCategoryFilter] = useState("");
+
+  const loadSkills = useCallback(async () => {
+    if (!currentUser?.id) {
+      setSkillsLoading(false);
+      return;
+    }
+    try {
+      setSkillsError("");
+      const response = await fetch(`${API_BASE}/api/employee/skills/${currentUser.id}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Failed to load skills");
+      setSkills(data);
+    } catch (err) {
+      setSkillsError(err.message || "Failed to load skills");
+    } finally {
+      setSkillsLoading(false);
+    }
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    loadSkills();
+  }, [loadSkills]);
+
+  const filteredSkills = useMemo(() => {
+    const term = skillSearch.trim().toLowerCase();
+    return skills.filter((skill) => {
+      if (skillCategoryFilter && skill.skill_category !== skillCategoryFilter) return false;
+      if (!term) return true;
+      return [skill.skill_name, skill.other_skill, skill.skill_category]
+        .some((value) => (value || "").toLowerCase().includes(term));
+    });
+  }, [skills, skillSearch, skillCategoryFilter]);
+
+  const advancedCount = skills.filter((s) => s.proficiency === "Advanced").length;
+  const expertCount = skills.filter((s) => s.proficiency === "Expert").length;
+
+  const skillRows = filteredSkills.map((skill) => {
+    const style = CATEGORY_STYLE[skill.skill_category] || CATEGORY_STYLE.Others;
+    const years = skill.years_of_experience === null ? null : Number(skill.years_of_experience);
+    const verified = skill.verification_status === "Verified";
+    const highLevel = skill.proficiency === "Advanced" || skill.proficiency === "Expert";
+    return (
+      <div className="esc-skill-row" key={skill.id}>
+        <div className="esc-skill-name">
+          <div className={`esc-skill-avatar ${style.avatar}`}>
+            <i className={`bi ${style.icon}`}></i>
+          </div>
+          <div>
+            <strong>{skill.skill_category === "Others" && skill.other_skill ? skill.other_skill : skill.skill_name}</strong>
+            <span>{skill.skill_category}</span>
+          </div>
+        </div>
+
+        <div className="esc-skill-category">
+          <span>{skill.skill_category}</span>
+        </div>
+
+        <div className="esc-skill-level">
+          <span className={`esc-level-badge ${highLevel ? "esc-level-advanced" : "esc-level-intermediate"}`}>
+            {skill.proficiency}
+          </span>
+          <div className="esc-level-progress">
+            <span style={{ width: `${LEVEL_WIDTH[skill.proficiency] || 25}%` }}></span>
+          </div>
+        </div>
+
+        <div className="esc-skill-experience">
+          <strong>{years === null ? "ΓÇö" : `${years} ${years === 1 ? "year" : "years"}`}</strong>
+          <span>Experience</span>
+        </div>
+
+        <div className="esc-skill-verified" style={verified ? undefined : { color: "#f59a42" }}>
+          <i className={`bi ${verified ? "bi-patch-check-fill" : "bi-clock-fill"}`}></i>
+          {verified ? "Verified" : "Pending"}
+        </div>
+      </div>
+    );
+  });
+
+  const updateSkillField = (event) => {
+    const { name, value } = event.target;
+    setSkillForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const closeSkill = () => {
+    setIsSkillOpen(false);
+    setSkillForm(EMPTY_SKILL_FORM);
+    setSkillFeedback({ type: "", text: "" });
+  };
+
+  const saveSkill = async () => {
+    if (!skillForm.skillName.trim() || !skillForm.skillCategory) {
+      setSkillFeedback({ type: "danger", text: "Skill and skill category are required." });
+      return;
+    }
+    if (skillForm.skillCategory === "Others" && !skillForm.otherSkill.trim()) {
+      setSkillFeedback({ type: "danger", text: "Enter the other skill name." });
+      return;
+    }
+
+    try {
+      setSkillSubmitting(true);
+      setSkillFeedback({ type: "", text: "" });
+      const response = await fetch(`${API_BASE}/api/employee/skills/${currentUser.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(skillForm),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Failed to save skill");
+      setSkillForm(EMPTY_SKILL_FORM);
+      setSkillFeedback({ type: "success", text: data.message });
+      loadSkills();
+    } catch (err) {
+      setSkillFeedback({ type: "danger", text: err.message || "Failed to save skill" });
+    } finally {
+      setSkillSubmitting(false);
+    }
+  };
   return (
     <>
 <div className="px-0 px-md-5 employee-dashboard">
@@ -93,7 +405,7 @@ export default function SkillsCertifications() {
 
                                     <div>
                                         <span>Total Skills</span>
-                                        <strong id="escTotalSkills">8</strong>
+                                        <strong id="escTotalSkills">{skills.length}</strong>
                                         <small>Across all categories</small>
                                     </div>
                                 </div>
@@ -107,7 +419,7 @@ export default function SkillsCertifications() {
 
                                     <div>
                                         <span>Advanced Skills</span>
-                                        <strong id="escAdvancedSkills">5</strong>
+                                        <strong id="escAdvancedSkills">{advancedCount}</strong>
                                         <small>High proficiency</small>
                                     </div>
                                 </div>
@@ -121,8 +433,8 @@ export default function SkillsCertifications() {
 
                                     <div>
                                         <span>Expert Skills</span>
-                                        <strong id="escVerifiedSkills">6</strong>
-                                        <small>Verified by HR</small>
+                                        <strong id="escVerifiedSkills">{expertCount}</strong>
+                                        <small>Highest proficiency</small>
                                     </div>
                                 </div>
                             </div>
@@ -135,7 +447,7 @@ export default function SkillsCertifications() {
 
                                     <div>
                                         <span>Certifications</span>
-                                        <strong id="escCertificationCount">3</strong>
+                                        <strong id="escCertificationCount">{certs.length}</strong>
                                         <small>Active credentials</small>
                                     </div>
                                 </div>
@@ -171,10 +483,12 @@ export default function SkillsCertifications() {
                                             type="text"
                                             id="escSkillSearch"
                                             placeholder="Search skills..."
+                                            value={skillSearch}
+                                            onChange={(e) => setSkillSearch(e.target.value)}
                                          />
                                     </div>
 
-                                    <select className="form-select esc-filter-select" id="escSkillCategoryFilter">
+                                    <select className="form-select esc-filter-select" id="escSkillCategoryFilter" value={skillCategoryFilter} onChange={(e) => setSkillCategoryFilter(e.target.value)}>
                                         <option value="">All Categories</option>
                                         <option value="Programming">Programming</option>
                                         <option value="Framework">Framework</option>
@@ -188,7 +502,7 @@ export default function SkillsCertifications() {
                                         <option value="Domain Knowledge">Domain Knowledge</option>
                                     </select>
 
-                                    <button type="button" className="btn esc-btn-outline" id="escAddSkillBtn">
+                                    <button type="button" className="btn esc-btn-primary" id="escAddSkillBtn" onClick={() => setIsSkillOpen(true)}>
                                         <i className="bi bi-plus-lg"></i>
                                         Add Skill
                                     </button>
@@ -200,332 +514,19 @@ export default function SkillsCertifications() {
 
                             
                             <div className="esc-skills-list" id="escSkillsList">
+                                {skillRows}
 
-                                
-                                <div
-                                    className="esc-skill-row"
-                                    data-skill="Java"
-                                    data-category="Programming"
-                                >
-
-                                    <div className="esc-skill-name">
-                                        <div className="esc-skill-avatar esc-java">
-                                            <i className="bi bi-cup-hot"></i>
-                                        </div>
-
-                                        <div>
-                                            <strong>Java</strong>
-                                            <span>Programming</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="esc-skill-category">
-                                        <span>Programming</span>
-                                    </div>
-
-                                    <div className="esc-skill-level">
-                                        <span className="esc-level-badge esc-level-advanced">
-                                            Advanced
-                                        </span>
-
-                                        <div className="esc-level-progress">
-                                            <span style={{width: "90%"}}></span>
-                                        </div>
-                                    </div>
-
-                                    <div className="esc-skill-experience">
-                                        <strong>6 years</strong>
-                                        <span>Experience</span>
-                                    </div>
-
-                                    <div className="esc-skill-verified">
-                                        <i className="bi bi-patch-check-fill"></i>
-                                        Verified
-                                    </div>
-
-                                    <div className="dropdown">
-                                        <button
-                                            className="btn esc-more-btn"
-                                            data-bs-toggle="dropdown"
-                                        >
-                                            <i className="bi bi-three-dots"></i>
-                                        </button>
-
-                                        <ul className="dropdown-menu dropdown-menu-end">
-                                            <li>
-                                                <button className="dropdown-item esc-edit-skill">
-                                                    <i className="bi bi-pencil"></i>
-                                                    Edit
-                                                </button>
-                                            </li>
-
-                                            <li>
-                                                <button className="dropdown-item esc-view-skill">
-                                                    <i className="bi bi-eye"></i>
-                                                    View Details
-                                                </button>
-                                            </li>
-
-                                            <li>
-                                                <hr className="dropdown-divider" />
-                                            </li>
-
-                                            <li>
-                                                <button className="dropdown-item text-danger esc-delete-skill">
-                                                    <i className="bi bi-trash"></i>
-                                                    Delete
-                                                </button>
-                                            </li>
-                                        </ul>
-                                    </div>
-
-                                </div>
-
-
-                                
-                                <div
-                                    className="esc-skill-row"
-                                    data-skill="Spring Boot"
-                                    data-category="Framework"
-                                >
-
-                                    <div className="esc-skill-name">
-                                        <div className="esc-skill-avatar esc-spring">
-                                            <i className="bi bi-boxes"></i>
-                                        </div>
-
-                                        <div>
-                                            <strong>Spring Boot</strong>
-                                            <span>Framework</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="esc-skill-category">
-                                        <span>Framework</span>
-                                    </div>
-
-                                    <div className="esc-skill-level">
-                                        <span className="esc-level-badge esc-level-advanced">
-                                            Advanced
-                                        </span>
-
-                                        <div className="esc-level-progress">
-                                            <span style={{width: "88%"}}></span>
-                                        </div>
-                                    </div>
-
-                                    <div className="esc-skill-experience">
-                                        <strong>5 years</strong>
-                                        <span>Experience</span>
-                                    </div>
-
-                                    <div className="esc-skill-verified">
-                                        <i className="bi bi-patch-check-fill"></i>
-                                        Verified
-                                    </div>
-
-                                    <div className="dropdown">
-                                        <button className="btn esc-more-btn" data-bs-toggle="dropdown">
-                                            <i className="bi bi-three-dots"></i>
-                                        </button>
-
-                                        <ul className="dropdown-menu dropdown-menu-end">
-                                            <li>
-                                                <button className="dropdown-item esc-edit-skill">
-                                                    <i className="bi bi-pencil"></i>
-                                                    Edit
-                                                </button>
-                                            </li>
-
-                                            <li>
-                                                <button className="dropdown-item esc-view-skill">
-                                                    <i className="bi bi-eye"></i>
-                                                    View Details
-                                                </button>
-                                            </li>
-
-                                            <li>
-                                                <hr className="dropdown-divider" />
-                                            </li>
-
-                                            <li>
-                                                <button className="dropdown-item text-danger esc-delete-skill">
-                                                    <i className="bi bi-trash"></i>
-                                                    Delete
-                                                </button>
-                                            </li>
-                                        </ul>
-                                    </div>
-
-                                </div>
-
-
-                                
-                                <div
-                                    className="esc-skill-row"
-                                    data-skill="AWS"
-                                    data-category="Cloud"
-                                >
-
-                                    <div className="esc-skill-name">
-                                        <div className="esc-skill-avatar esc-aws">
-                                            <i className="bi bi-cloud"></i>
-                                        </div>
-
-                                        <div>
-                                            <strong>AWS</strong>
-                                            <span>Cloud</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="esc-skill-category">
-                                        <span>Cloud</span>
-                                    </div>
-
-                                    <div className="esc-skill-level">
-                                        <span className="esc-level-badge esc-level-intermediate">
-                                            Intermediate
-                                        </span>
-
-                                        <div className="esc-level-progress">
-                                            <span style={{width: "65%"}}></span>
-                                        </div>
-                                    </div>
-
-                                    <div className="esc-skill-experience">
-                                        <strong>3 years</strong>
-                                        <span>Experience</span>
-                                    </div>
-
-                                    <div className="esc-skill-verified">
-                                        <i className="bi bi-patch-check-fill"></i>
-                                        Verified
-                                    </div>
-
-                                    <div className="dropdown">
-                                        <button className="btn esc-more-btn" data-bs-toggle="dropdown">
-                                            <i className="bi bi-three-dots"></i>
-                                        </button>
-
-                                        <ul className="dropdown-menu dropdown-menu-end">
-                                            <li>
-                                                <button className="dropdown-item esc-edit-skill">
-                                                    <i className="bi bi-pencil"></i>
-                                                    Edit
-                                                </button>
-                                            </li>
-
-                                            <li>
-                                                <button className="dropdown-item esc-view-skill">
-                                                    <i className="bi bi-eye"></i>
-                                                    View Details
-                                                </button>
-                                            </li>
-
-                                            <li>
-                                                <hr className="dropdown-divider" />
-                                            </li>
-
-                                            <li>
-                                                <button className="dropdown-item text-danger esc-delete-skill">
-                                                    <i className="bi bi-trash"></i>
-                                                    Delete
-                                                </button>
-                                            </li>
-                                        </ul>
-                                    </div>
-
-                                </div>
-
-
-                                
-                                <div
-                                    className="esc-skill-row"
-                                    data-skill="PostgreSQL"
-                                    data-category="Database"
-                                >
-
-                                    <div className="esc-skill-name">
-                                        <div className="esc-skill-avatar esc-postgresql">
-                                            <i className="bi bi-database"></i>
-                                        </div>
-
-                                        <div>
-                                            <strong>PostgreSQL</strong>
-                                            <span>Database</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="esc-skill-category">
-                                        <span>Database</span>
-                                    </div>
-
-                                    <div className="esc-skill-level">
-                                        <span className="esc-level-badge esc-level-advanced">
-                                            Advanced
-                                        </span>
-
-                                        <div className="esc-level-progress">
-                                            <span style={{width: "85%"}}></span>
-                                        </div>
-                                    </div>
-
-                                    <div className="esc-skill-experience">
-                                        <strong>5 years</strong>
-                                        <span>Experience</span>
-                                    </div>
-
-                                    <div className="esc-skill-verified">
-                                        <i className="bi bi-patch-check-fill"></i>
-                                        Verified
-                                    </div>
-
-                                    <div className="dropdown">
-                                        <button className="btn esc-more-btn" data-bs-toggle="dropdown">
-                                            <i className="bi bi-three-dots"></i>
-                                        </button>
-
-                                        <ul className="dropdown-menu dropdown-menu-end">
-                                            <li>
-                                                <button className="dropdown-item esc-edit-skill">
-                                                    <i className="bi bi-pencil"></i>
-                                                    Edit
-                                                </button>
-                                            </li>
-
-                                            <li>
-                                                <button className="dropdown-item esc-view-skill">
-                                                    <i className="bi bi-eye"></i>
-                                                    View Details
-                                                </button>
-                                            </li>
-
-                                            <li>
-                                                <hr className="dropdown-divider" />
-                                            </li>
-
-                                            <li>
-                                                <button className="dropdown-item text-danger esc-delete-skill">
-                                                    <i className="bi bi-trash"></i>
-                                                    Delete
-                                                </button>
-                                            </li>
-                                        </ul>
-                                    </div>
-
-                                </div>
+                                {!skillsLoading && filteredSkills.length === 0 && (
+                                    <p className="text-center text-muted py-4 mb-0">
+                                        {skillsError || "No skills found."}
+                                    </p>
+                                )}
 
                             </div>
 
                         </div>
 
-
-                        
-
-                        
-
-
-                        
+            
 
                         <div className="esc-section-card esc-certification-section">
 
@@ -542,7 +543,7 @@ export default function SkillsCertifications() {
                                     </div>
                                 </div>
 
-                                <button className="btn esc-btn-primary esc-cert-add-inline" id="escAddCertificationInline">
+                                <button className="btn esc-btn-primary" id="escAddCertificationInline" type="button" onClick={() => setIsCertOpen(true)}>
                                     <i className="bi bi-plus-lg"></i>
                                     Add Certification
                                 </button>
@@ -552,319 +553,13 @@ export default function SkillsCertifications() {
 
                             <div className="row g-3" id="escCertificationList">
 
-                                
-                                <div className="col-xl-4 col-lg-6">
-
-                                    <div className="esc-cert-card">
-
-                                        <div className="esc-cert-top">
-
-                                            <div className="esc-cert-logo">
-                                                <i className="bi bi-cloud-check"></i>
-                                            </div>
-
-                                            <div className="dropdown">
-                                                <button className="btn esc-more-btn" data-bs-toggle="dropdown">
-                                                    <i className="bi bi-three-dots"></i>
-                                                </button>
-
-                                                <ul className="dropdown-menu dropdown-menu-end">
-                                                    <li>
-                                                        <button className="dropdown-item esc-preview-cert">
-                                                            <i className="bi bi-eye"></i>
-                                                            Preview
-                                                        </button>
-                                                    </li>
-
-                                                    <li>
-                                                        <button className="dropdown-item">
-                                                            <i className="bi bi-pencil"></i>
-                                                            Edit
-                                                        </button>
-                                                    </li>
-
-                                                    <li>
-                                                        <button className="dropdown-item">
-                                                            <i className="bi bi-download"></i>
-                                                            Download
-                                                        </button>
-                                                    </li>
-
-                                                    <li>
-                                                        <hr className="dropdown-divider" />
-                                                    </li>
-
-                                                    <li>
-                                                        <button className="dropdown-item text-danger">
-                                                            <i className="bi bi-trash"></i>
-                                                            Delete
-                                                        </button>
-                                                    </li>
-                                                </ul>
-                                            </div>
-
-                                        </div>
-
-                                        <div className="esc-cert-content">
-
-                                            <span className="esc-cert-category">
-                                                Cloud Certification
-                                            </span>
-
-                                            <h4>AWS Certified Developer</h4>
-
-                                            <p className="esc-cert-org">
-                                                Amazon Web Services
-                                            </p>
-
-                                            <div className="esc-cert-info">
-
-                                                <div>
-                                                    <span>Certificate Number</span>
-                                                    <strong>AWS-DEV-48291</strong>
-                                                </div>
-
-                                                <div>
-                                                    <span>Issue Date</span>
-                                                    <strong>12-Jun-2025</strong>
-                                                </div>
-
-                                                <div>
-                                                    <span>Expiry Date</span>
-                                                    <strong>12-Jun-2028</strong>
-                                                </div>
-
-                                            </div>
-
-                                        </div>
-
-                                        <div className="esc-cert-footer">
-
-                                            <span className="esc-cert-verified">
-                                                <i className="bi bi-patch-check-fill"></i>
-                                                Verified
-                                            </span>
-
-                                            <button className="btn esc-cert-view-btn">
-                                                View Certificate
-                                                <i className="bi bi-arrow-up-right"></i>
-                                            </button>
-
-                                        </div>
-
-                                    </div>
-
-                                </div>
-
-
-                                
-                                <div className="col-xl-4 col-lg-6">
-
-                                    <div className="esc-cert-card">
-
-                                        <div className="esc-cert-top">
-
-                                            <div className="esc-cert-logo esc-cert-green">
-                                                <i className="bi bi-database-check"></i>
-                                            </div>
-
-                                            <div className="dropdown">
-                                                <button className="btn esc-more-btn" data-bs-toggle="dropdown">
-                                                    <i className="bi bi-three-dots"></i>
-                                                </button>
-
-                                                <ul className="dropdown-menu dropdown-menu-end">
-                                                    <li>
-                                                        <button className="dropdown-item">
-                                                            <i className="bi bi-eye"></i>
-                                                            Preview
-                                                        </button>
-                                                    </li>
-
-                                                    <li>
-                                                        <button className="dropdown-item">
-                                                            <i className="bi bi-pencil"></i>
-                                                            Edit
-                                                        </button>
-                                                    </li>
-
-                                                    <li>
-                                                        <button className="dropdown-item">
-                                                            <i className="bi bi-download"></i>
-                                                            Download
-                                                        </button>
-                                                    </li>
-
-                                                    <li>
-                                                        <hr className="dropdown-divider" />
-                                                    </li>
-
-                                                    <li>
-                                                        <button className="dropdown-item text-danger">
-                                                            <i className="bi bi-trash"></i>
-                                                            Delete
-                                                        </button>
-                                                    </li>
-                                                </ul>
-                                            </div>
-
-                                        </div>
-
-                                        <div className="esc-cert-content">
-
-                                            <span className="esc-cert-category">
-                                                Database
-                                            </span>
-
-                                            <h4>PostgreSQL Professional</h4>
-
-                                            <p className="esc-cert-org">
-                                                PostgreSQL Global Development Group
-                                            </p>
-
-                                            <div className="esc-cert-info">
-
-                                                <div>
-                                                    <span>Certificate Number</span>
-                                                    <strong>PG-2025-1842</strong>
-                                                </div>
-
-                                                <div>
-                                                    <span>Issue Date</span>
-                                                    <strong>08-Aug-2025</strong>
-                                                </div>
-
-                                                <div>
-                                                    <span>Expiry Date</span>
-                                                    <strong>08-Aug-2028</strong>
-                                                </div>
-
-                                            </div>
-
-                                        </div>
-
-                                        <div className="esc-cert-footer">
-
-                                            <span className="esc-cert-verified">
-                                                <i className="bi bi-patch-check-fill"></i>
-                                                Verified
-                                            </span>
-
-                                            <button className="btn esc-cert-view-btn">
-                                                View Certificate
-                                                <i className="bi bi-arrow-up-right"></i>
-                                            </button>
-
-                                        </div>
-
-                                    </div>
-
-                                </div>
-
-
-                                
-                                <div className="col-xl-4 col-lg-6">
-
-                                    <div className="esc-cert-card">
-
-                                        <div className="esc-cert-top">
-
-                                            <div className="esc-cert-logo esc-cert-orange">
-                                                <i className="bi bi-diagram-3"></i>
-                                            </div>
-
-                                            <div className="dropdown">
-                                                <button className="btn esc-more-btn" data-bs-toggle="dropdown">
-                                                    <i className="bi bi-three-dots"></i>
-                                                </button>
-
-                                                <ul className="dropdown-menu dropdown-menu-end">
-                                                    <li>
-                                                        <button className="dropdown-item">
-                                                            <i className="bi bi-eye"></i>
-                                                            Preview
-                                                        </button>
-                                                    </li>
-
-                                                    <li>
-                                                        <button className="dropdown-item">
-                                                            <i className="bi bi-pencil"></i>
-                                                            Edit
-                                                        </button>
-                                                    </li>
-
-                                                    <li>
-                                                        <button className="dropdown-item">
-                                                            <i className="bi bi-download"></i>
-                                                            Download
-                                                        </button>
-                                                    </li>
-
-                                                    <li>
-                                                        <hr className="dropdown-divider" />
-                                                    </li>
-
-                                                    <li>
-                                                        <button className="dropdown-item text-danger">
-                                                            <i className="bi bi-trash"></i>
-                                                            Delete
-                                                        </button>
-                                                    </li>
-                                                </ul>
-                                            </div>
-
-                                        </div>
-
-                                        <div className="esc-cert-content">
-
-                                            <span className="esc-cert-category">
-                                                Framework
-                                            </span>
-
-                                            <h4>Spring Professional Certification</h4>
-
-                                            <p className="esc-cert-org">
-                                                VMware / Spring
-                                            </p>
-
-                                            <div className="esc-cert-info">
-
-                                                <div>
-                                                    <span>Certificate Number</span>
-                                                    <strong>SPR-2024-7218</strong>
-                                                </div>
-
-                                                <div>
-                                                    <span>Issue Date</span>
-                                                    <strong>20-Nov-2024</strong>
-                                                </div>
-
-                                                <div>
-                                                    <span>Expiry Date</span>
-                                                    <strong>20-Nov-2027</strong>
-                                                </div>
-
-                                            </div>
-
-                                        </div>
-
-                                        <div className="esc-cert-footer">
-
-                                            <span className="esc-cert-verified">
-                                                <i className="bi bi-patch-check-fill"></i>
-                                                Verified
-                                            </span>
-
-                                            <button className="btn esc-cert-view-btn">
-                                                View Certificate
-                                                <i className="bi bi-arrow-up-right"></i>
-                                            </button>
-
-                                        </div>
-
-                                    </div>
-
-                                </div>
+                                {certCards}
+
+                                {!certsLoading && certs.length === 0 && (
+                                    <p className="text-center text-muted py-4 mb-0">
+                                        {certsError || "No certifications found."}
+                                    </p>
+                                )}
 
                             </div>
 
@@ -875,7 +570,17 @@ export default function SkillsCertifications() {
 
                     
 
-                    <div className="modal fade" id="escSkillModal" tabIndex="-1" aria-hidden="true">
+                    {isSkillOpen && <div className="modal-backdrop fade show" onClick={closeSkill}></div>}
+
+                    <div
+                        className={`modal fade${isSkillOpen ? " show d-block" : ""}`}
+                        id="escSkillModal"
+                        tabIndex="-1"
+                        aria-hidden={!isSkillOpen}
+                        onClick={(event) => {
+                            if (event.target === event.currentTarget) closeSkill();
+                        }}
+                    >
 
                         <div className="modal-dialog modal-dialog-centered modal-lg">
 
@@ -893,7 +598,8 @@ export default function SkillsCertifications() {
                                     <button
                                         type="button"
                                         className="btn-close"
-                                        data-bs-dismiss="modal"
+                                        aria-label="Close"
+                                        onClick={closeSkill}
                                     ></button>
 
                                 </div>
@@ -908,13 +614,16 @@ export default function SkillsCertifications() {
                                                 type="text"
                                                 className="form-control"
                                                 id="escSkillInput"
+                                                name="skillName"
+                                                value={skillForm.skillName}
+                                                onChange={updateSkillField}
                                                 placeholder="e.g. Java"
                                              />
                                         </div>
 
                                         <div className="col-md-6">
                                             <label className="form-label">Skill Category</label>
-                                            <select className="form-select" id="escSkillCategoryInput">
+                                            <select className="form-select" id="escSkillCategoryInput" name="skillCategory" value={skillCategory} onChange={updateSkillField}>
                                                 <option value="">Select category</option>
                                                 <option>Programming</option>
                                                 <option>Framework</option>
@@ -933,13 +642,13 @@ export default function SkillsCertifications() {
                                         <div className="col-md-6">
                                             <label className="form-label">Other Skill</label>
 
-                                            <input className="form-control" placeholder="...." disabled />
+                                            <input className="form-control" placeholder="...." name="otherSkill" value={skillForm.otherSkill} onChange={updateSkillField} disabled={skillCategory !== "Others"} />
                                         </div>
 
                                         <div className="col-md-6">
                                             <label className="form-label">Proficiency</label>
 
-                                            <select className="form-select" id="escSkillProficiencyInput">
+                                            <select className="form-select" id="escSkillProficiencyInput" name="proficiency" value={skillForm.proficiency} onChange={updateSkillField}>
                                                 <option>Beginner</option>
                                                 <option>Intermediate</option>
                                                 <option>Advanced</option>
@@ -954,6 +663,9 @@ export default function SkillsCertifications() {
                                                 type="number"
                                                 className="form-control"
                                                 id="escSkillExperienceInput"
+                                                name="yearsOfExperience"
+                                                value={skillForm.yearsOfExperience}
+                                                onChange={updateSkillField}
                                                 min="0"
                                                 step="0.5"
                                                 placeholder="e.g. 4"
@@ -967,6 +679,9 @@ export default function SkillsCertifications() {
                                                 type="date"
                                                 className="form-control"
                                                 id="escSkillLastUsedInput"
+                                                name="lastUsed"
+                                                value={skillForm.lastUsed}
+                                                onChange={updateSkillField}
                                              />
                                         </div>
 
@@ -978,10 +693,12 @@ export default function SkillsCertifications() {
 
                                 <div className="modal-footer esc-modal-footer">
 
+                                    {skillFeedback.text && <span className={`me-auto small text-${skillFeedback.type}`}>{skillFeedback.text}</span>}
+
                                     <button
                                         type="button"
                                         className="btn esc-cancel-btn"
-                                        data-bs-dismiss="modal"
+                                        onClick={closeSkill}
                                     >
                                         Cancel
                                     </button>
@@ -990,9 +707,11 @@ export default function SkillsCertifications() {
                                         type="button"
                                         className="btn esc-btn-primary"
                                         id="escSaveSkillBtn"
+                                        onClick={saveSkill}
+                                        disabled={skillSubmitting}
                                     >
                                         <i className="bi bi-check-lg"></i>
-                                        Save Skill
+                                        {skillSubmitting ? "Saving..." : "Save Skill"}
                                     </button>
 
                                 </div>
@@ -1006,7 +725,17 @@ export default function SkillsCertifications() {
 
                     
 
-                    <div className="modal fade" id="escCertificationModal" tabIndex="-1" aria-hidden="true">
+                    {isCertOpen && <div className="modal-backdrop fade show" onClick={closeCert}></div>}
+
+                    <div
+                        className={`modal fade${isCertOpen ? " show d-block" : ""}`}
+                        id="escCertificationModal"
+                        tabIndex="-1"
+                        aria-hidden={!isCertOpen}
+                        onClick={(event) => {
+                            if (event.target === event.currentTarget) closeCert();
+                        }}
+                    >
 
                         <div className="modal-dialog modal-dialog-centered modal-lg">
 
@@ -1024,7 +753,8 @@ export default function SkillsCertifications() {
                                     <button
                                         type="button"
                                         className="btn-close"
-                                        data-bs-dismiss="modal"
+                                        aria-label="Close"
+                                        onClick={closeCert}
                                     ></button>
 
                                 </div>
@@ -1035,7 +765,7 @@ export default function SkillsCertifications() {
 
                                         <div className="col-md-6">
                                             <label className="form-label">Skill Category</label>
-                                            <select className="form-select" id="escSkillCategoryInput">
+                                            <select className="form-select" id="escSkillCategoryInput" name="skillCategory" value={certForm.skillCategory} onChange={updateCertField}>
                                                 <option value="">Select category</option>
                                                 <option>Programming</option>
                                                 <option>Framework</option>
@@ -1060,6 +790,9 @@ export default function SkillsCertifications() {
                                                 type="text"
                                                 className="form-control"
                                                 id="escCertificationName"
+                                                name="certificationName"
+                                                value={certForm.certificationName}
+                                                onChange={updateCertField}
                                                 placeholder="e.g. AWS Certified Developer"
                                              />
                                         </div>
@@ -1073,6 +806,9 @@ export default function SkillsCertifications() {
                                                 type="text"
                                                 className="form-control"
                                                 id="escCertificationOrganization"
+                                                name="issuingOrganization"
+                                                value={certForm.issuingOrganization}
+                                                onChange={updateCertField}
                                                 placeholder="Organization name"
                                              />
                                         </div>
@@ -1086,6 +822,9 @@ export default function SkillsCertifications() {
                                                 type="text"
                                                 className="form-control"
                                                 id="escCertificationNumber"
+                                                name="certificateNumber"
+                                                value={certForm.certificateNumber}
+                                                onChange={updateCertField}
                                                 placeholder="Certificate number"
                                              />
                                         </div>
@@ -1099,6 +838,9 @@ export default function SkillsCertifications() {
                                                 type="date"
                                                 className="form-control"
                                                 id="escCertificationIssueDate"
+                                                name="issueDate"
+                                                value={certForm.issueDate}
+                                                onChange={updateCertField}
                                              />
                                         </div>
 
@@ -1111,6 +853,9 @@ export default function SkillsCertifications() {
                                                 type="date"
                                                 className="form-control"
                                                 id="escCertificationExpiryDate"
+                                                name="expiryDate"
+                                                value={certForm.expiryDate}
+                                                onChange={updateCertField}
                                              />
                                         </div>
 
@@ -1125,7 +870,7 @@ export default function SkillsCertifications() {
                                                 <i className="bi bi-cloud-arrow-up"></i>
 
                                                 <span>
-                                                    <strong>Choose certificate</strong>
+                                                    <strong>{certFile ? certFile.name : "Choose certificate"}</strong>
                                                     <small>PDF, JPG or PNG</small>
                                                 </span>
 
@@ -1133,6 +878,7 @@ export default function SkillsCertifications() {
                                                     type="file"
                                                     id="escCertificationFile"
                                                     accept=".pdf,.jpg,.jpeg,.png"
+                                                    onChange={pickCertFile}
                                                  />
 
                                             </label>
@@ -1145,10 +891,12 @@ export default function SkillsCertifications() {
 
                                 <div className="modal-footer esc-modal-footer">
 
+                                    {certFeedback.text && <span className={`me-auto small text-${certFeedback.type}`}>{certFeedback.text}</span>}
+
                                     <button
                                         type="button"
                                         className="btn esc-cancel-btn"
-                                        data-bs-dismiss="modal"
+                                        onClick={closeCert}
                                     >
                                         Cancel
                                     </button>
@@ -1157,9 +905,11 @@ export default function SkillsCertifications() {
                                         type="button"
                                         className="btn esc-btn-primary"
                                         id="escSaveCertificationBtn"
+                                        onClick={saveCertification}
+                                        disabled={certSubmitting}
                                     >
                                         <i className="bi bi-check-lg"></i>
-                                        Save Certification
+                                        {certSubmitting ? "Saving..." : "Save Certification"}
                                     </button>
 
                                 </div>

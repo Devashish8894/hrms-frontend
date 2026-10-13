@@ -23410,3 +23410,142 @@ a:active,
 a:visited {
     text-decoration: none !important;
 }
+
+.esc-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.esc-cert-add-inline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.es-bank-edit-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 0;
+    background: transparent;
+    color: var(--text-color, #24263d);
+    padding: 8px 10px;
+    font-weight: 500;
+}
+
+.es-bank-edit-trigger:hover {
+    color: var(--primary, #3c2fbc);
+}
+
+.es-pending-badge {
+    background: #fff3df;
+    color: #a76500;
+}
+
+.es-status-pending {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 7px;
+    background: #fff3df;
+    color: #a76500;
+    font-weight: 650;
+}
+
+#esAccountRevealModal .modal-dialog {
+    width: min(92vw, 560px);
+    max-width: 560px;
+}
+
+#esAccountRevealModal .es-modal-content {
+    border-radius: 22px;
+}
+
+#esAccountRevealModal .modal-footer .btn.es-btn-primary {
+    padding: 11px 17px;
+    border: 1px solid var(--primary, #3c2fbc);
+    border-radius: 12px;
+    background: var(--primary, #3c2fbc);
+    color: #fff;
+    font-weight: 600;
+}
+
+#esAccountRevealModal .modal-footer .btn.es-btn-primary:hover {
+    background: var(--primary-dark, #5144cc);
+    color: #fff;
+}
+
+#esAccountRevealModal .modal-footer .btn.es-btn-light {
+    padding: 11px 17px;
+    border: 1px solid var(--card-border, #ebecf3);
+    border-radius: 12px;
+    background: #fff;
+    color: #55586f;
+    font-weight: 600;
+}
+
+.epd-detail-head { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.epd-detail-head strong { display: block; color: #1b1a3f; font-size: 15px; }
+.epd-detail-head span { color: #7b7a96; font-size: 13px; word-break: break-all; }
+.epd-detail-grid span { display: block; color: #7b7a96; font-size: 12.5px; }
+.epd-detail-grid strong { display: block; color: #1b1a3f; font-size: 15px; word-break: break-word; }
+
+.esc-section-tools #escAddSkillBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    height: 42px;
+    padding: 0 18px;
+    border: 1px solid #3c2fbc;
+    border-radius: 11px;
+    background: #3c2fbc;
+    color: #fff;
+    font-weight: 700;
+    white-space: nowrap;
+    box-shadow: 0 8px 18px rgba(60, 47, 188, .22);
+}
+.esc-section-tools #escAddSkillBtn:hover {
+    background: #5144cc;
+    border-color: #5144cc;
+    color: #fff;
+}
+.esc-section-tools .esc-filter-select {
+    flex: 0 0 180px;
+    width: 180px;
+}
+.esc-section-tools .esc-search-box {
+    flex: 0 1 230px;
+    min-width: 140px;
+}
+
+.epd-actions { display: inline-flex; align-items: center; gap: 8px; }
+.epd-edit-btn, .epd-delete-btn { border: 0; border-radius: 9px; padding: 8px 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.epd-edit-btn { background: #e8f1ff; color: #2f6fe4; }
+.epd-edit-btn:hover { background: #2f6fe4; color: #fff; }
+.epd-delete-btn { background: #ffecec; color: #d64545; }
+.epd-delete-btn:hover { background: #d64545; color: #fff; }
+
+#escAddCertificationInline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    height: 42px;
+    padding: 0 18px;
+    border: 1px solid #3c2fbc;
+    border-radius: 11px;
+    background: #3c2fbc;
+    color: #fff;
+    font-weight: 700;
+    white-space: nowrap;
+    box-shadow: 0 8px 18px rgba(60, 47, 188, .22);
+}
+#escAddCertificationInline:hover {
+    background: #5144cc;
+    border-color: #5144cc;
+    color: #fff;
+}

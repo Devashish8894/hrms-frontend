@@ -1607,16 +1607,16 @@ export default function EmployeeTemplate({
             </div>
   </>
 )}
-{activePage === "employee-profile" && <EmployeeProfile />}
+{activePage === "employee-profile" && <EmployeeProfile currentUser={currentUser} employeeProfile={employeeProfile} />}
 {activePage === "employement-details" && <EmploymentDetails employeeProfile={employeeProfile} currentUser={currentUser} />}
-{activePage === "documents" && <Documents employeeProfile={employeeProfile} />}
-{activePage === "skills-certifications" && <SkillsCertifications employeeProfile={employeeProfile} />}
+{activePage === "documents" && <Documents employeeProfile={employeeProfile} currentUser={currentUser} />}
+{activePage === "skills-certifications" && <SkillsCertifications employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "attendance" && <Attendance currentUser={currentUser} employeeProfile={employeeProfile} />}
 {activePage === "leaves" && <Leaves currentUser={currentUser} employeeProfile={employeeProfile} />}
 {activePage === "assets" && <Assets employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "access-accounts" && <AccessAccounts employeeProfile={employeeProfile} />}
 {activePage === "notifications" && <Notifications employeeProfile={employeeProfile} />}
-{activePage === "settings" && <Settings employeeProfile={employeeProfile} />}
+{activePage === "settings" && <Settings employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "exit-management" && <ExitManagement employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "employee-requests" && <EmployeeRequests employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "calendar" && <Calendar employeeProfile={employeeProfile} currentUser={currentUser} />}

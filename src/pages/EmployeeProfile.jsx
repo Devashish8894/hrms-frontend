@@ -1,6 +1,84 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
-export default function EmployeeProfile() {
+const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+
+const formatDate = (value) => {
+    if (!value) return "-";
+    const date = new Date(`${value}T00:00:00`);
+    return Number.isNaN(date.getTime())
+        ? value
+        : date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+};
+
+export default function EmployeeProfile({ currentUser }) {
+    const [personalInfo, setPersonalInfo] = useState(null);
+    const [contactInfo, setContactInfo] = useState(null);
+    const [profile, setProfile] = useState(null);
+    const [employmentInfo, setEmploymentInfo] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (!currentUser?.id) {
+            setLoading(false);
+            return;
+        }
+
+        const load = async (path) => {
+            const response = await fetch(`${API_BASE}/api/employee/${path}/${currentUser.id}`);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || "Failed to load data");
+            return data;
+        };
+
+        (async () => {
+            try {
+                setLoading(true);
+                setError("");
+                const [personal, contact, prof, employment] = await Promise.all([
+                    load("personal-info"),
+                    load("contact-info"),
+                    load("profile"),
+                    load("employment-info"),
+                ]);
+                setPersonalInfo(personal);
+                setContactInfo(contact);
+                setProfile(prof);
+                setEmploymentInfo(employment);
+            } catch (err) {
+                setError(err.message || "Unable to load personal information");
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, [currentUser?.id]);
+
+    const fullName = personalInfo
+        ? [personalInfo.first_name, personalInfo.middle_name, personalInfo.last_name].filter(Boolean).join(" ")
+        : "";
+    const location = contactInfo
+        ? [contactInfo.current_city, contactInfo.current_state, contactInfo.current_country].filter(Boolean).join(", ")
+        : "";
+    const personalItems = [
+        { label: "Full Name", value: fullName },
+        { label: "Employee ID", value: profile?.employee_code },
+        { label: "Email", value: contactInfo?.work_email || profile?.email },
+        { label: "Phone", value: contactInfo?.phone_number },
+        { label: "Date of Birth", value: personalInfo?.date_of_birth ? formatDate(personalInfo.date_of_birth) : "" },
+        { label: "Location", value: location },
+    ];
+
+    const employmentItems = [
+        { label: "Department", value: employmentInfo?.department },
+        { label: "Team", value: employmentInfo?.team },
+        { label: "Designation", value: employmentInfo?.designation },
+        { label: "Manager", value: employmentInfo?.reporting_manager },
+        { label: "Joining Date", value: employmentInfo?.joining_date ? formatDate(employmentInfo.joining_date) : "" },
+        { label: "Employment Type", value: employmentInfo?.employment_type },
+        { label: "Work Mode", value: employmentInfo?.work_mode },
+        { label: "Location", value: employmentInfo?.office_location },
+    ];
+
   return (
     <>
 <div className="px-0 px-md-5 employee-dashboard">
@@ -151,37 +229,16 @@ export default function EmployeeProfile() {
                                     </div>
 
 
+                                    {error && <p className="text-danger px-3">{error}</p>}
+
                                     <div className="row g-0 ep-information-grid">
 
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Full Name</span>
-                                            <strong>Anil Kumar</strong>
-                                        </div>
-
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Employee ID</span>
-                                            <strong>EMP-000124</strong>
-                                        </div>
-
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Email</span>
-                                            <strong>arun.kumar@example.com</strong>
-                                        </div>
-
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Phone</span>
-                                            <strong>+91 98765 43210</strong>
-                                        </div>
-
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Date of Birth</span>
-                                            <strong>18 August 1998</strong>
-                                        </div>
-
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Location</span>
-                                            <strong>Hyderabad, India</strong>
-                                        </div>
+                                        {personalItems.map((item) => (
+                                            <div className="col-md-6 ep-information-item" key={item.label}>
+                                                <span>{item.label}</span>
+                                                <strong>{loading ? "Loading..." : item.value || "-"}</strong>
+                                            </div>
+                                        ))}
 
                                     </div>
 
@@ -210,45 +267,12 @@ export default function EmployeeProfile() {
 
                                     <div className="row g-0 ep-information-grid">
 
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Department</span>
-                                            <strong>Engineering</strong>
-                                        </div>
-
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Team</span>
-                                            <strong>Backend</strong>
-                                        </div>
-
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Designation</span>
-                                            <strong>Senior Software Engineer</strong>
-                                        </div>
-
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Manager</span>
-                                            <strong>Priya Sharma</strong>
-                                        </div>
-
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Joining Date</span>
-                                            <strong>15 January 2025</strong>
-                                        </div>
-
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Employment Type</span>
-                                            <strong>Permanent</strong>
-                                        </div>
-
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Work Mode</span>
-                                            <strong>Hybrid</strong>
-                                        </div>
-
-                                        <div className="col-md-6 ep-information-item">
-                                            <span>Location</span>
-                                            <strong>Hyderabad</strong>
-                                        </div>
+                                        {employmentItems.map((item) => (
+                                            <div className="col-md-6 ep-information-item" key={item.label}>
+                                                <span>{item.label}</span>
+                                                <strong>{loading ? "Loading..." : item.value || "-"}</strong>
+                                            </div>
+                                        ))}
 
                                     </div>
 
@@ -312,7 +336,7 @@ export default function EmployeeProfile() {
                                                     <span>Skills</span>
 
                                                     <strong className="ep-skill-preview">
-                                                        React · Laravel · MySQL
+                                                        React ┬╖ Laravel ┬╖ MySQL
                                                     </strong>
                                                 </div>
 
@@ -502,12 +526,12 @@ export default function EmployeeProfile() {
                                     <div className="ep-person-card">
 
                                         <div className="ep-person-avatar ep-avatar-blue">
-                                            PS
+                                            MVP
                                         </div>
 
                                         <div className="ep-person-info">
                                             <span>Reporting Manager</span>
-                                            <strong>Priya Sharma</strong>
+                                            <strong>Maruthi Vara Prasad</strong>
                                             <small>Engineering Manager</small>
                                         </div>
 
@@ -519,7 +543,7 @@ export default function EmployeeProfile() {
 
 
                                     
-                                    <div className="ep-person-card">
+                                    {/* <div className="ep-person-card">
 
                                         <div className="ep-person-avatar ep-avatar-pink">
                                             AR
@@ -535,7 +559,7 @@ export default function EmployeeProfile() {
                                             <i className="bi bi-chevron-right"></i>
                                         </button>
 
-                                    </div>
+                                    </div> */}
 
                                 </div>
 
