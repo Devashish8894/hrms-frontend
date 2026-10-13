@@ -23411,145 +23411,6 @@ a:visited {
     text-decoration: none !important;
 }
 
-.esc-btn-primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.esc-cert-add-inline {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.es-bank-edit-trigger {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    border: 0;
-    background: transparent;
-    color: var(--text-color, #24263d);
-    padding: 8px 10px;
-    font-weight: 500;
-}
-
-.es-bank-edit-trigger:hover {
-    color: var(--primary, #3c2fbc);
-}
-
-.es-pending-badge {
-    background: #fff3df;
-    color: #a76500;
-}
-
-.es-status-pending {
-    display: inline-flex;
-    align-items: center;
-    padding: 5px 10px;
-    border-radius: 7px;
-    background: #fff3df;
-    color: #a76500;
-    font-weight: 650;
-}
-
-#esAccountRevealModal .modal-dialog {
-    width: min(92vw, 560px);
-    max-width: 560px;
-}
-
-#esAccountRevealModal .es-modal-content {
-    border-radius: 22px;
-}
-
-#esAccountRevealModal .modal-footer .btn.es-btn-primary {
-    padding: 11px 17px;
-    border: 1px solid var(--primary, #3c2fbc);
-    border-radius: 12px;
-    background: var(--primary, #3c2fbc);
-    color: #fff;
-    font-weight: 600;
-}
-
-#esAccountRevealModal .modal-footer .btn.es-btn-primary:hover {
-    background: var(--primary-dark, #5144cc);
-    color: #fff;
-}
-
-#esAccountRevealModal .modal-footer .btn.es-btn-light {
-    padding: 11px 17px;
-    border: 1px solid var(--card-border, #ebecf3);
-    border-radius: 12px;
-    background: #fff;
-    color: #55586f;
-    font-weight: 600;
-}
-
-.epd-detail-head { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-.epd-detail-head strong { display: block; color: #1b1a3f; font-size: 15px; }
-.epd-detail-head span { color: #7b7a96; font-size: 13px; word-break: break-all; }
-.epd-detail-grid span { display: block; color: #7b7a96; font-size: 12.5px; }
-.epd-detail-grid strong { display: block; color: #1b1a3f; font-size: 15px; word-break: break-word; }
-
-.esc-section-tools #escAddSkillBtn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    flex: none;
-    height: 42px;
-    padding: 0 18px;
-    border: 1px solid #3c2fbc;
-    border-radius: 11px;
-    background: #3c2fbc;
-    color: #fff;
-    font-weight: 700;
-    white-space: nowrap;
-    box-shadow: 0 8px 18px rgba(60, 47, 188, .22);
-}
-.esc-section-tools #escAddSkillBtn:hover {
-    background: #5144cc;
-    border-color: #5144cc;
-    color: #fff;
-}
-.esc-section-tools .esc-filter-select {
-    flex: 0 0 180px;
-    width: 180px;
-}
-.esc-section-tools .esc-search-box {
-    flex: 0 1 230px;
-    min-width: 140px;
-}
-
-.epd-actions { display: inline-flex; align-items: center; gap: 8px; }
-.epd-edit-btn, .epd-delete-btn { border: 0; border-radius: 9px; padding: 8px 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
-.epd-edit-btn { background: #e8f1ff; color: #2f6fe4; }
-.epd-edit-btn:hover { background: #2f6fe4; color: #fff; }
-.epd-delete-btn { background: #ffecec; color: #d64545; }
-.epd-delete-btn:hover { background: #d64545; color: #fff; }
-
-#escAddCertificationInline {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    flex: none;
-    height: 42px;
-    padding: 0 18px;
-    border: 1px solid #3c2fbc;
-    border-radius: 11px;
-    background: #3c2fbc;
-    color: #fff;
-    font-weight: 700;
-    white-space: nowrap;
-    box-shadow: 0 8px 18px rgba(60, 47, 188, .22);
-}
-#escAddCertificationInline:hover {
-    background: #5144cc;
-    border-color: #5144cc;
-    color: #fff;
-}
-
 /* =========================================================
    LOGIN SCREEN (.auth-page)
 ========================================================= */
@@ -23589,14 +23450,14 @@ a:visited {
             #3c2fbc 100%);
 }
 
-.auth-page .auth-background {
+.auth-background {
     position: absolute;
     inset: 0;
     pointer-events: none;
     overflow: hidden;
 }
 
-.auth-page .bg-grid {
+.bg-grid {
     position: absolute;
     inset: 0;
     opacity: 0.12;
@@ -23607,13 +23468,13 @@ a:visited {
     mask-image: linear-gradient(90deg, black, transparent 85%);
 }
 
-.auth-page .bg-glow {
+.bg-glow {
     position: absolute;
     border-radius: 50%;
     filter: blur(10px);
 }
 
-.auth-page .glow-one {
+.glow-one {
     width: 480px;
     height: 480px;
     top: -180px;
@@ -23621,7 +23482,7 @@ a:visited {
     background: rgba(141, 130, 255, 0.22);
 }
 
-.auth-page .glow-two {
+.glow-two {
     width: 600px;
     height: 600px;
     right: -280px;
@@ -23629,7 +23490,7 @@ a:visited {
     background: rgba(103, 88, 232, 0.24);
 }
 
-.auth-page .glow-three {
+.glow-three {
     width: 250px;
     height: 250px;
     right: 38%;
@@ -23637,27 +23498,27 @@ a:visited {
     background: rgba(255, 255, 255, 0.08);
 }
 
-.auth-page .orb {
+.orb {
     position: absolute;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 50%;
 }
 
-.auth-page .orb-one {
+.orb-one {
     width: 620px;
     height: 620px;
     left: -300px;
     top: 20%;
 }
 
-.auth-page .orb-two {
+.orb-two {
     width: 420px;
     height: 420px;
     right: -190px;
     top: -120px;
 }
 
-.auth-page .orb-three {
+.orb-three {
     width: 280px;
     height: 280px;
     right: 15%;
@@ -23665,7 +23526,7 @@ a:visited {
     border-color: rgba(255, 255, 255, 0.08);
 }
 
-.auth-page .dot {
+.dot {
     position: absolute;
     width: 6px;
     height: 6px;
@@ -23674,32 +23535,32 @@ a:visited {
     box-shadow: 0 0 18px rgba(255, 255, 255, 0.35);
 }
 
-.auth-page .dot-one {
+.dot-one {
     left: 10%;
     top: 24%;
 }
 
-.auth-page .dot-two {
+.dot-two {
     left: 38%;
     top: 12%;
 }
 
-.auth-page .dot-three {
+.dot-three {
     left: 46%;
     bottom: 15%;
 }
 
-.auth-page .dot-four {
+.dot-four {
     right: 12%;
     top: 30%;
 }
 
-.auth-page .dot-five {
+.dot-five {
     right: 25%;
     bottom: 18%;
 }
 
-.auth-page .auth-content {
+.auth-content {
     position: relative;
     z-index: 5;
     min-height: 100vh;
@@ -23709,34 +23570,41 @@ a:visited {
     padding: 30px;
 }
 
-.auth-page .auth-wrapper {
+.auth-wrapper {
     width: 100%;
     max-width: 1380px;
     margin: 0 auto;
 }
 
-.auth-page .visual-panel {
-    position: relative;
-    min-height: 720px;
-    height: 100%;
-    padding: 55px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 30px 0px 0px 30px;
-    background:
-        linear-gradient(145deg,
-            rgba(255, 255, 255, 0.12),
-            rgba(255, 255, 255, 0.025));
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        var(--shadow);
-    backdrop-filter: blur(18px);
-}
+        .visual-panel {
+            position: relative;
+            /* min-height: 720px; */
+            height: 100%;
 
-.auth-page .visual-panel::before {
+            padding: 55px;
+
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+
+            overflow: hidden;
+
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 30px 0px 0px 30px;
+
+            background:
+                linear-gradient(145deg,
+                    rgba(255, 255, 255, 0.12),
+                    rgba(255, 255, 255, 0.025));
+
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.12),
+                var(--shadow);
+
+            backdrop-filter: blur(18px);
+        }
+
+.visual-panel::before {
     content: "";
     position: absolute;
     width: 520px;
@@ -23750,7 +23618,7 @@ a:visited {
             transparent 68%);
 }
 
-.auth-page .visual-panel::after {
+.visual-panel::after {
     content: "";
     position: absolute;
     width: 380px;
@@ -23802,13 +23670,13 @@ a:visited {
     letter-spacing: -0.4px;
 }
 
-.auth-page .visual-content {
+.visual-content {
     position: relative;
     z-index: 2;
     max-width: 610px;
 }
 
-.auth-page .visual-badge {
+.visual-badge {
     display: inline-flex;
     align-items: center;
     gap: 9px;
@@ -23820,7 +23688,7 @@ a:visited {
     letter-spacing: 0.4px;
 }
 
-.auth-page .badge-dot {
+.badge-dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
@@ -23828,7 +23696,7 @@ a:visited {
     box-shadow: 0 0 14px #b7afff;
 }
 
-.auth-page .visual-title {
+.visual-title {
     margin: 25px 0 18px;
     color: var(--white);
     font-size: clamp(38px, 4vw, 65px);
@@ -23837,7 +23705,7 @@ a:visited {
     letter-spacing: -2.8px;
 }
 
-.auth-page .visual-title span {
+.visual-title span {
     display: block;
     background: linear-gradient(90deg, #ffffff, #b9b1ff);
     -webkit-background-clip: text;
@@ -23845,14 +23713,14 @@ a:visited {
     color: transparent;
 }
 
-.auth-page .visual-description {
+.visual-description {
     max-width: 510px;
     margin: 0;
     color: rgba(255, 255, 255, 0.68);
     line-height: 1.75;
 }
 
-.auth-page .visual-footer {
+.visual-footer {
     position: relative;
     z-index: 2;
     display: flex;
@@ -23863,34 +23731,40 @@ a:visited {
     border-top: 1px solid rgba(255, 255, 255, 0.10);
 }
 
-.auth-page .footer-item {
+.footer-item {
     display: flex;
     align-items: center;
     gap: 10px;
     color: rgba(255, 255, 255, 0.60);
 }
 
-.auth-page .footer-item i {
+.footer-item i {
     color: #b8b1ff;
 }
 
-.auth-page .login-panel {
-    position: relative;
-    min-height: 720px;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    padding: 55px;
-    overflow: hidden;
-    border-radius: 0px 30px 30px 0px;
-    background:
-        linear-gradient(145deg,
-            rgba(255, 255, 255, 0.98),
-            rgba(249, 248, 255, 0.96));
-    box-shadow: var(--shadow);
-}
+        .login-panel {
+            position: relative;
+            /* min-height: 720px; */
+            height: 100%;
 
-.auth-page .login-panel::before {
+            display: flex;
+            align-items: center;
+
+            padding: 55px;
+
+            overflow: hidden;
+
+            border-radius: 0px 30px 30px 0px;
+
+            background:
+                linear-gradient(145deg,
+                    rgba(255, 255, 255, 0.98),
+                    rgba(249, 248, 255, 0.96));
+
+            box-shadow: var(--shadow);
+        }
+
+.login-panel::before {
     content: "";
     position: absolute;
     width: 300px;
@@ -23904,7 +23778,7 @@ a:visited {
             transparent 68%);
 }
 
-.auth-page .login-inner {
+.login-inner {
     position: relative;
     z-index: 2;
     width: 100%;
@@ -23912,24 +23786,27 @@ a:visited {
     margin: 0 auto;
 }
 
-.auth-page .login-heading {
-    margin-bottom: 38px;
-}
+        .login-heading {
+            margin-bottom: 20px;
+        }
 
-.auth-page .login-heading h1 {
-    margin: 0 0 10px;
-    color: var(--text-dark);
-    font-size: 34px;
-    line-height: 1.15;
-    font-weight: 700;
-    letter-spacing: -1px;
-}
+        .login-heading h1 {
+            margin: 0 0 0px;
 
-.auth-page .login-heading p {
-    margin: 0;
-    color: var(--text-muted);
-    line-height: 1.65;
-}
+            color: var(--text-dark);
+
+            font-size: 34px;
+            line-height: 1.15;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+
+        .login-heading p {
+            margin: 0;
+
+            color: var(--text-muted);
+            line-height: 1.65;
+        }
 
 .auth-page .form-group {
     margin-bottom: 22px;
@@ -23941,11 +23818,11 @@ a:visited {
     font-weight: 600;
 }
 
-.auth-page .input-wrapper {
+.input-wrapper {
     position: relative;
 }
 
-.auth-page .input-icon {
+.input-icon {
     position: absolute;
     left: 17px;
     top: 50%;
@@ -23978,7 +23855,7 @@ a:visited {
     box-shadow: 0 0 0 4px rgba(60, 47, 188, 0.10);
 }
 
-.auth-page .password-toggle {
+.password-toggle {
     position: absolute;
     right: 15px;
     top: 50%;
@@ -23996,11 +23873,11 @@ a:visited {
     transition: color 0.2s ease;
 }
 
-.auth-page .password-toggle:hover {
+.password-toggle:hover {
     color: var(--primary);
 }
 
-.auth-page .login-options {
+.login-options {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -24035,17 +23912,17 @@ a:visited {
     cursor: pointer;
 }
 
-.auth-page .forgot-link {
+.forgot-link {
     color: var(--primary);
     text-decoration: none;
     font-weight: 600;
 }
 
-.auth-page .forgot-link:hover {
+.forgot-link:hover {
     color: var(--primary-dark);
 }
 
-.auth-page .login-btn {
+.login-btn {
     position: relative;
     width: 100%;
     min-height: 57px;
@@ -24069,7 +23946,7 @@ a:visited {
         box-shadow 0.2s ease;
 }
 
-.auth-page .login-btn::before {
+.login-btn::before {
     content: "";
     position: absolute;
     inset: 0;
@@ -24082,36 +23959,38 @@ a:visited {
     transition: transform 0.6s ease;
 }
 
-.auth-page .login-btn:hover {
+.login-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 18px 35px rgba(60, 47, 188, 0.30);
 }
 
-.auth-page .login-btn:hover::before {
+.login-btn:hover::before {
     transform: translateX(100%);
 }
 
-.auth-page .login-btn:active {
+.login-btn:active {
     transform: translateY(0);
 }
 
-.auth-page .divider {
+.divider {
     display: flex;
     align-items: center;
     gap: 15px;
-    margin: 30px 0;
+
+    margin: 20px 0;
+
     color: #a2a4b2;
 }
 
-.auth-page .divider::before,
-.auth-page .divider::after {
+.divider::before,
+.divider::after {
     content: "";
     flex: 1;
     height: 1px;
     background: #e9e9f1;
 }
 
-.auth-page .security-note {
+.security-note {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -24119,11 +23998,11 @@ a:visited {
     color: #9698aa;
 }
 
-.auth-page .security-note i {
+.security-note i {
     color: var(--primary);
 }
 
-.auth-page .mobile-brand {
+.mobile-brand {
     display: none;
     align-items: center;
     gap: 12px;
@@ -24132,7 +24011,7 @@ a:visited {
     font-weight: 700;
 }
 
-.auth-page .mobile-brand .brand-icon {
+.mobile-brand .brand-icon {
     color: var(--white);
     background:
         linear-gradient(145deg,
@@ -24142,18 +24021,18 @@ a:visited {
 }
 
 @media (max-width: 1199.98px) {
-    .auth-page .auth-content {
+    .auth-content {
         padding: 20px;
     }
 
-    .auth-page .visual-panel,
-    .auth-page .login-panel {
-        min-height: 680px;
+    .visual-panel,
+    .login-panel {
+        /* min-height: 680px; */
         height: 100%;
         padding: 42px;
     }
 
-    .auth-page .visual-title {
+    .visual-title {
         font-size: 46px;
     }
 }
@@ -24164,18 +24043,18 @@ a:visited {
         overflow: visible;
     }
 
-    .auth-page .auth-content {
+    .auth-content {
         min-height: 100vh;
         min-height: 100dvh;
         align-items: flex-start;
         padding: 18px;
     }
 
-    .auth-page .visual-panel {
+    .visual-panel {
         display: none;
     }
 
-    .auth-page .login-panel {
+    .login-panel {
         min-height: calc(100vh - 36px);
         min-height: calc(100dvh - 36px);
         height: auto;
@@ -24183,21 +24062,21 @@ a:visited {
         border-radius: 28px;
     }
 
-    .auth-page .login-inner {
+    .login-inner {
         max-width: 520px;
     }
 
-    .auth-page .mobile-brand {
+    .mobile-brand {
         display: flex !important;
     }
 }
 
 @media (max-width: 575.98px) {
-    .auth-page .auth-content {
+    .auth-content {
         padding: 0;
     }
 
-    .auth-page .login-panel {
+    .login-panel {
         min-height: 100vh;
         min-height: 100dvh;
         display: flex;
@@ -24206,25 +24085,25 @@ a:visited {
         border-radius: 0;
     }
 
-    .auth-page .login-inner {
+    .login-inner {
         max-width: none;
     }
 
-    .auth-page .login-heading {
+    .login-heading {
         margin-bottom: 30px;
     }
 
-    .auth-page .login-heading h1 {
+    .login-heading h1 {
         font-size: 30px;
     }
 
-    .auth-page .login-options {
+    .login-options {
         align-items: flex-start;
         flex-direction: column;
         gap: 14px;
     }
 
-    .auth-page .mobile-brand {
+    .mobile-brand {
         margin-bottom: 45px;
     }
 
