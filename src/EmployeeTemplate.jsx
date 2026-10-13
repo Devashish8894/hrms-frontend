@@ -144,6 +144,28 @@ export default function EmployeeTemplate({
       }
   }, [currentUser]);
 
+  const [teamMembers, setTeamMembers] = useState([]);
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/admin/employees?orgId=1`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          // Exclude duplicates and current user, take up to 4
+          const seen = new Set();
+          const filtered = [];
+          data.forEach(emp => {
+            if (emp.email && !seen.has(emp.email) && emp.email.toLowerCase() !== (currentUser?.email || '').toLowerCase()) {
+              seen.add(emp.email);
+              filtered.push(emp);
+            }
+          });
+          setTeamMembers(filtered.slice(0, 4));
+        }
+      })
+      .catch(console.error);
+  }, [currentUser]);
+
   const dashComputedBalances = (leavesData.balances || []).map(b => {
       const typeName = b.leave_type_name;
       const actualUsed = (leavesData.requests || [])
@@ -327,7 +349,7 @@ export default function EmployeeTemplate({
                 </div>
                 <div>
                     <h5>Ramel | HR</h5>
-                    <span>Admin Workspace</span>
+                    <span>Employee Workspace</span>
                 </div>
             </div>
             <button type="button" className="btn-close" data-bs-dismiss="offcanvas"></button>
@@ -462,7 +484,7 @@ export default function EmployeeTemplate({
 
                         <div>
                             <h5>Ramel HR</h5>
-                            <span>Admin Workspace</span>
+                            <span>Employee Workspace</span>
                         </div>
 
                     </span>
@@ -894,7 +916,7 @@ export default function EmployeeTemplate({
                         <div className="row g-3">
 
                             <div className="col-xl col-lg-3 col-md-4 col-6">
-                                <button className="ed-quick-card">
+                                <button className="ed-quick-card" onClick={() => navigateTo("leaves")}>
                                     <span className="ed-quick-icon ed-q-purple">
                                         <i className="bi bi-calendar-plus"></i>
                                     </span>
@@ -904,7 +926,7 @@ export default function EmployeeTemplate({
                             </div>
 
                             <div className="col-xl col-lg-3 col-md-4 col-6">
-                                <button className="ed-quick-card">
+                                <button className="ed-quick-card" onClick={() => navigateTo("attendance")}>
                                     <span className="ed-quick-icon ed-q-blue">
                                         <i className="bi bi-calendar-check"></i>
                                     </span>
@@ -914,17 +936,17 @@ export default function EmployeeTemplate({
                             </div>
 
                             <div className="col-xl col-lg-3 col-md-4 col-6">
-                                <button className="ed-quick-card">
+                                <button className="ed-quick-card" onClick={() => navigateTo("employee-requests")}>
                                     <span className="ed-quick-icon ed-q-orange">
                                         <i className="bi bi-send"></i>
                                     </span>
                                     <strong>New Request</strong>
-                                    <small>Contact HR / Admin</small>
+                                    <small>Submit request</small>
                                 </button>
                             </div>
 
                             <div className="col-xl col-lg-3 col-md-4 col-6">
-                                <button className="ed-quick-card">
+                                <button className="ed-quick-card" onClick={() => navigateTo("documents")}>
                                     <span className="ed-quick-icon ed-q-green">
                                         <i className="bi bi-folder2-open"></i>
                                     </span>
@@ -934,7 +956,7 @@ export default function EmployeeTemplate({
                             </div>
 
                             <div className="col-xl col-lg-3 col-md-4 col-6">
-                                <button className="ed-quick-card">
+                                <button className="ed-quick-card" onClick={() => navigateTo("assets")}>
                                     <span className="ed-quick-icon ed-q-pink">
                                         <i className="bi bi-laptop"></i>
                                     </span>
@@ -944,7 +966,7 @@ export default function EmployeeTemplate({
                             </div>
 
                             <div className="col-xl col-lg-3 col-md-4 col-6">
-                                <button className="ed-quick-card">
+                                <button className="ed-quick-card" onClick={() => navigateTo("employee-profile")}>
                                     <span className="ed-quick-icon ed-q-dark">
                                         <i className="bi bi-person"></i>
                                     </span>
@@ -1291,94 +1313,33 @@ export default function EmployeeTemplate({
                                     </div>
 
                                     <div className="ed-team-list">
+                                        {(teamMembers.length > 0 ? teamMembers : [
+                                            { id: 4, full_name: "Priya Sharma", designation: "QA Automation Engineer", status: "Active" },
+                                            { id: 3, full_name: "Yash Raj", designation: "Software Engineer", status: "Active" },
+                                            { id: 5, full_name: "Rahul Verma", designation: "Associate Specialist", status: "Active" },
+                                        ]).map((member, idx) => (
+                                            <div className="ed-team-member" key={member.id || idx}>
+                                                <div className="ed-team-avatar">
+                                                    <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: ["#ede9fe", "#e0f2fe", "#fef3c7", "#dcfce7"][idx % 4], color: ["#6366f1", "#0284c7", "#d97706", "#16a34a"][idx % 4], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: "14px" }}>
+                                                        {(member.full_name || "EM").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+                                                    </div>
+                                                    <span></span>
+                                                </div>
 
-                                        <div className="ed-team-member">
-                                            <div className="ed-team-avatar">
-                                                <img src="https://i.pravatar.cc/100?img=47"
-                                                    alt="Priya Sharma" />
-                                                <span></span>
+                                                <div className="ed-team-info">
+                                                    <strong>{member.full_name || member.email}</strong>
+                                                    <span>{member.designation || member.role_name || "Engineering"}</span>
+                                                </div>
+
+                                                <div className="ed-team-status">
+                                                    <span className="ed-status-present">{member.status || "Active"}</span>
+                                                </div>
+
+                                                <button className="ed-team-action">
+                                                    <i className="bi bi-chat"></i>
+                                                </button>
                                             </div>
-
-                                            <div className="ed-team-info">
-                                                <strong>Priya Sharma</strong>
-                                                <span>Engineering Manager</span>
-                                            </div>
-
-                                            <div className="ed-team-status">
-                                                <span className="ed-status-present">Present</span>
-                                            </div>
-
-                                            <button className="ed-team-action">
-                                                <i className="bi bi-chat"></i>
-                                            </button>
-                                        </div>
-
-
-                                        <div className="ed-team-member">
-                                            <div className="ed-team-avatar">
-                                                <img src="https://i.pravatar.cc/100?img=11"
-                                                    alt="Rahul Reddy" />
-                                                <span></span>
-                                            </div>
-
-                                            <div className="ed-team-info">
-                                                <strong>Rahul Reddy</strong>
-                                                <span>Backend Developer</span>
-                                            </div>
-
-                                            <div className="ed-team-status">
-                                                <span className="ed-status-present">Present</span>
-                                            </div>
-
-                                            <button className="ed-team-action">
-                                                <i className="bi bi-chat"></i>
-                                            </button>
-                                        </div>
-
-
-                                        <div className="ed-team-member">
-                                            <div className="ed-team-avatar">
-                                                <img src="https://i.pravatar.cc/100?img=32"
-                                                    alt="Sneha Rao" />
-                                                <span className="ed-team-away"></span>
-                                            </div>
-
-                                            <div className="ed-team-info">
-                                                <strong>Sneha Rao</strong>
-                                                <span>UI/UX Designer</span>
-                                            </div>
-
-                                            <div className="ed-team-status">
-                                                <span className="ed-status-leave">On Leave</span>
-                                            </div>
-
-                                            <button className="ed-team-action">
-                                                <i className="bi bi-chat"></i>
-                                            </button>
-                                        </div>
-
-
-                                        <div className="ed-team-member">
-                                            <div className="ed-team-avatar">
-                                                <img src="https://i.pravatar.cc/100?img=68"
-                                                    alt="Vikram Singh" />
-                                                <span></span>
-                                            </div>
-
-                                            <div className="ed-team-info">
-                                                <strong>Vikram Singh</strong>
-                                                <span>Frontend Developer</span>
-                                            </div>
-
-                                            <div className="ed-team-status">
-                                                <span className="ed-status-present">Present</span>
-                                            </div>
-
-                                            <button className="ed-team-action">
-                                                <i className="bi bi-chat"></i>
-                                            </button>
-                                        </div>
-
+                                        ))}
                                     </div>
 
                                 </div>
@@ -1461,7 +1422,7 @@ export default function EmployeeTemplate({
 
                                     </div>
 
-                                    <button className="ed-view-all-btn">
+                                    <button className="ed-view-all-btn" onClick={() => navigateTo("notifications")}>
                                         View all notifications
                                         <i className="bi bi-arrow-right"></i>
                                     </button>
