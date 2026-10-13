@@ -10,7 +10,7 @@ export default function Sidebar({ isOpen, toggleSidebar, activeMenu, setActiveMe
     { name: 'Attendance', icon: 'bi-clock', page: 'attendance' },
     { name: 'Leave', icon: 'bi-calendar', page: 'leaves' },
     { name: 'Assets', icon: 'bi-laptop', page: 'assets' },
-    { name: 'Access & Accounts', icon: 'bi-shield-lock', page: 'access-accounts' },
+    // { name: 'Access & Accounts', icon: 'bi-shield-lock', page: 'access-accounts' },
     { name: 'Notifications', icon: 'bi-bell', page: 'notifications' },
     { name: 'Settings', icon: 'bi-gear', page: 'settings' },
     { name: 'Resignation & Exit', icon: 'bi-box-arrow-right', page: 'exit-management' },

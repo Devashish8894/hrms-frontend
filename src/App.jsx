@@ -35,6 +35,7 @@ export default function App() {
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [loadingAuth, setLoadingAuth] = useState(false);
 
@@ -307,10 +308,34 @@ export default function App() {
   const fetchEmployeeProfile = async () => {
     if (!currentUser || isAdmin) return;
     try {
-      const res = await fetch(`${API_BASE}/api/employee/profile/${currentUser.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setEmployeeProfile(data);
+      const [res, personalRes] = await Promise.all([
+        fetch(`${API_BASE}/api/employee/profile/${currentUser.id}`),
+        fetch(`${API_BASE}/api/employee/personal-info/${currentUser.id}`).catch(() => null),
+      ]);
+      let profileData = {};
+      if (res && res.ok) {
+        profileData = await res.json();
+      }
+      if (personalRes && personalRes.ok) {
+        const personalData = await personalRes.json();
+        if (personalData) {
+          if (personalData.preferred_name) {
+            profileData.preferred_name = personalData.preferred_name;
+          }
+          if (personalData.first_name && !profileData.first_name) {
+            profileData.first_name = personalData.first_name;
+          }
+          if (personalData.last_name && !profileData.last_name) {
+            profileData.last_name = personalData.last_name;
+          }
+        }
+      }
+      const savedPreferred = localStorage.getItem(`hrms_preferred_name_${currentUser.id}`);
+      if (!profileData.preferred_name) {
+        profileData.preferred_name = savedPreferred || profileData.first_name || '';
+      }
+      if (Object.keys(profileData).length > 0) {
+        setEmployeeProfile(profileData);
       }
     } catch (error) {
       console.error('Error fetching employee profile:', error);
@@ -535,102 +560,215 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <div className="min-vh-100 bg-light d-flex align-items-center justify-content-center p-3">
-        <div
-          className="card shadow border-0"
-          style={{
-            width: '100%',
-            maxWidth: '450px',
-          }}
-        >
-          <div className="card-body p-4 p-md-5">
-            <div className="text-center mb-4">
-              <h2 className="fw-bold mb-1">
-                Ramel HR Portal
-              </h2>
+      <main className="auth-page">
+        {/* BACKGROUND */}
+        <div className="auth-background">
+          <div className="bg-grid"></div>
 
-              <p className="text-muted mb-0">
-                Sign in to your organization workspace
-              </p>
+          <div className="bg-glow glow-one"></div>
+          <div className="bg-glow glow-two"></div>
+          <div className="bg-glow glow-three"></div>
+
+          <div className="orb orb-one"></div>
+          <div className="orb orb-two"></div>
+          <div className="orb orb-three"></div>
+
+          <span className="dot dot-one"></span>
+          <span className="dot dot-two"></span>
+          <span className="dot dot-three"></span>
+          <span className="dot dot-four"></span>
+          <span className="dot dot-five"></span>
+        </div>
+
+        {/* AUTH CONTENT */}
+        <div className="auth-content">
+          <div className="auth-wrapper">
+            <div className="row g-0 justify-content-center">
+              {/* LEFT VISUAL AREA */}
+              <div className="col-lg-5">
+                <section className="visual-panel">
+                  <a className="brand" href="/">
+                    <span className="brand-icon">
+                      <i className="bi bi-grid-1x2-fill"></i>
+                    </span>
+                    <span className="brand-name">Ramel HR</span>
+                  </a>
+
+                  <div className="visual-content">
+                    <span className="visual-badge">
+                      <span className="badge-dot"></span>
+                      Secure access
+                    </span>
+
+                    <h2 className="visual-title">
+                      Everything you need.
+                      <span>One place.</span>
+                    </h2>
+
+                    <p className="visual-description">
+                      Access your account through a secure, streamlined
+                      experience designed to keep your work connected and
+                      organized.
+                    </p>
+                  </div>
+
+                  <div className="visual-footer">
+                    <div className="footer-item">
+                      <i className="bi bi-shield-check"></i>
+                      <span>Secure authentication</span>
+                    </div>
+
+                    <div className="footer-item">
+                      <i className="bi bi-lock"></i>
+                      <span>Protected access</span>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              {/* RIGHT LOGIN AREA */}
+              <div className="col-lg-5">
+                <section className="login-panel">
+                  <div className="login-inner">
+                    {/* Mobile Brand */}
+                    <div className="mobile-brand">
+                      <span className="brand-icon">
+                        <i className="bi bi-grid-1x2-fill"></i>
+                      </span>
+                      <span>Ramel HR</span>
+                    </div>
+
+                    {/* Login Heading */}
+                    <div className="login-heading">
+                      <h1>Welcome back</h1>
+                      <p>Sign in to continue to your account.</p>
+                    </div>
+
+                    {loginError && (
+                      <div className="alert alert-danger mb-3" role="alert">
+                        {loginError}
+                      </div>
+                    )}
+
+                    <form id="loginForm" onSubmit={handleLogin} noValidate>
+                      {/* Email */}
+                      <div className="form-group">
+                        <label htmlFor="email" className="form-label">
+                          Email address
+                        </label>
+
+                        <div className="input-wrapper">
+                          <i className="bi bi-envelope input-icon"></i>
+
+                          <input
+                            type="email"
+                            className="form-control"
+                            id="email"
+                            name="email"
+                            placeholder="Enter your email address"
+                            autoComplete="email"
+                            value={loginEmail}
+                            onChange={(e) => setLoginEmail(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Password */}
+                      <div className="form-group">
+                        <label htmlFor="password" className="form-label">
+                          Password
+                        </label>
+
+                        <div className="input-wrapper">
+                          <i className="bi bi-lock input-icon"></i>
+
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            className="form-control"
+                            id="password"
+                            name="password"
+                            placeholder="Enter your password"
+                            autoComplete="current-password"
+                            value={loginPassword}
+                            onChange={(e) => setLoginPassword(e.target.value)}
+                            required
+                          />
+
+                          <button
+                            type="button"
+                            className="password-toggle"
+                            id="passwordToggle"
+                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            onClick={() => setShowPassword((prev) => !prev)}
+                          >
+                            <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Options */}
+                      <div className="login-options">
+                        <div className="form-check">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id="remember"
+                            name="remember"
+                            value="1"
+                          />
+                          <label className="form-check-label" htmlFor="remember">
+                            Remember me
+                          </label>
+                        </div>
+
+                        <a
+                          href="#forgot"
+                          className="forgot-link"
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          Forgot password?
+                        </a>
+                      </div>
+
+                      {/* Submit */}
+                      <button
+                        type="submit"
+                        className="login-btn"
+                        id="loginButton"
+                        disabled={loadingAuth}
+                      >
+                        <span>{loadingAuth ? 'Signing in...' : 'Sign in'}</span>
+                        <i className="bi bi-arrow-right"></i>
+                      </button>
+                    </form>
+
+                    {/* Divider */}
+                    <div className="divider">
+                      <span>
+                        Don&apos;t have an account ?{' '}
+                        <a
+                          href="#register"
+                          className="forgot-link"
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          Register
+                        </a>
+                      </span>
+                    </div>
+
+                    {/* Security */}
+                    <div className="security-note">
+                      <i className="bi bi-shield-lock-fill"></i>
+                      <span>Your information is securely protected.</span>
+                    </div>
+                  </div>
+                </section>
+              </div>
             </div>
-
-            {loginError && (
-              <div
-                className="alert alert-danger"
-                role="alert"
-              >
-                {loginError}
-              </div>
-            )}
-
-            <form onSubmit={handleLogin}>
-              <div className="mb-3">
-                <label
-                  htmlFor="loginEmail"
-                  className="form-label fw-semibold"
-                >
-                  Work Email
-                </label>
-
-                <input
-                  id="loginEmail"
-                  type="email"
-                  className="form-control"
-                  placeholder="name@company.com"
-                  value={loginEmail}
-                  onChange={(e) =>
-                    setLoginEmail(e.target.value)
-                  }
-                  required
-                  autoComplete="email"
-                />
-              </div>
-
-              <div className="mb-3">
-                <label
-                  htmlFor="loginPassword"
-                  className="form-label fw-semibold"
-                >
-                  Password
-                </label>
-
-                <input
-                  id="loginPassword"
-                  type="password"
-                  className="form-control"
-                  placeholder="Enter password"
-                  value={loginPassword}
-                  onChange={(e) =>
-                    setLoginPassword(e.target.value)
-                  }
-                  required
-                  autoComplete="current-password"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primary w-100"
-                disabled={loadingAuth}
-              >
-                {loadingAuth
-                  ? 'Signing In...'
-                  : 'Sign In'}
-              </button>
-            </form>
-
-            {/* <div className="alert alert-light border mt-4 mb-0">
-              <small className="text-muted">
-                <strong>Default Admin</strong>
-                <br />
-                admin@ramel.co.in
-                <br />
-                password123
-              </small>
-            </div> */}
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -658,6 +796,7 @@ export default function App() {
         handleCheckOut={handleCheckOut}
         fetchAttendance={fetchAttendance}
         employeeProfile={employeeProfile}
+        fetchEmployeeProfile={fetchEmployeeProfile}
         attendanceStats={attendanceStats}
         fetchAttendanceStats={fetchAttendanceStats}
       />

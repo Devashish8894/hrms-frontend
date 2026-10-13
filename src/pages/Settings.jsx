@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
 
-export default function Settings({ currentUser }) {
+export default function Settings({ currentUser, employeeProfile, onProfileUpdate }) {
     const [personalInfo, setPersonalInfo] = useState(null);
     const [personalInfoLoading, setPersonalInfoLoading] = useState(true);
     const [personalInfoError, setPersonalInfoError] = useState("");
@@ -338,11 +338,12 @@ export default function Settings({ currentUser }) {
     const openPersonalEdit = () => {
         if (!personalInfo) return;
 
+        const savedPref = currentUser?.id ? localStorage.getItem(`hrms_preferred_name_${currentUser.id}`) : "";
         setPersonalEditForm({
             firstName: personalInfo.first_name || "",
             middleName: personalInfo.middle_name || "",
             lastName: personalInfo.last_name || "",
-            preferredName: personalInfo.first_name || "",
+            preferredName: personalInfo.preferred_name || savedPref || personalInfo.first_name || "",
             dateOfBirth: String(personalInfo.date_of_birth || "").slice(0, 10),
             gender: personalInfo.gender
                 ? `${personalInfo.gender.charAt(0).toUpperCase()}${personalInfo.gender.slice(1)}`
@@ -368,6 +369,11 @@ export default function Settings({ currentUser }) {
         setPersonalEditSubmitting(true);
         setPersonalEditFeedback("");
         try {
+            if (personalEditForm.preferredName) {
+                localStorage.setItem(`hrms_preferred_name_${currentUser.id}`, personalEditForm.preferredName.trim());
+            } else {
+                localStorage.removeItem(`hrms_preferred_name_${currentUser.id}`);
+            }
             const response = await fetch(
                 `${API_BASE}/api/employee/personal-info/${currentUser.id}`,
                 {
@@ -377,6 +383,7 @@ export default function Settings({ currentUser }) {
                         firstName: personalEditForm.firstName,
                         middleName: personalEditForm.middleName,
                         lastName: personalEditForm.lastName,
+                        preferredName: personalEditForm.preferredName || personalEditForm.firstName,
                         dateOfBirth: personalEditForm.dateOfBirth,
                         gender: personalEditForm.gender,
                         maritalStatus: personalEditForm.maritalStatus,
@@ -390,7 +397,13 @@ export default function Settings({ currentUser }) {
                 throw new Error(data.message || "Unable to update personal information.");
             }
 
-            setPersonalInfo(data);
+            setPersonalInfo({
+                ...data,
+                preferred_name: data.preferred_name || personalEditForm.preferredName || data.first_name,
+            });
+            if (onProfileUpdate) {
+                onProfileUpdate();
+            }
             setIsPersonalEditOpen(false);
         } catch (error) {
             setPersonalEditFeedback(error.message || "Unable to update personal information.");
@@ -715,28 +728,50 @@ export default function Settings({ currentUser }) {
     
     <div className="es-profile-banner">
         <div className="es-profile-avatar">
-            <span>AK</span>
+            <span>
+                {(personalInfo?.preferred_name
+                    ? personalInfo.preferred_name.slice(0, 2)
+                    : personalInfo?.first_name
+                        ? `${personalInfo.first_name[0]}${personalInfo.last_name ? personalInfo.last_name[0] : (personalInfo.first_name[1] || "")}`
+                        : employeeProfile?.preferred_name
+                            ? employeeProfile.preferred_name.slice(0, 2)
+                            : employeeProfile?.first_name
+                                ? `${employeeProfile.first_name[0]}${employeeProfile.last_name ? employeeProfile.last_name[0] : (employeeProfile.first_name[1] || "")}`
+                                : currentUser?.email ? currentUser.email.slice(0, 2) : "EM"
+                ).toUpperCase()}
+            </span>
             <button type="button" title="Change profile photo">
                 <i className="bi bi-camera-fill"></i>
             </button>
         </div>
         <div className="es-profile-info">
             <span className="es-profile-label">EMPLOYEE PROFILE</span>
-            <h3>Anil Kumar</h3>
-            <p>Senior Software Engineer ┬╖ Engineering / Backend</p>
+            <h3>
+                {personalInfo?.preferred_name ||
+                    [personalInfo?.first_name, personalInfo?.middle_name, personalInfo?.last_name].filter(Boolean).join(" ") ||
+                    employeeProfile?.preferred_name ||
+                    [employeeProfile?.first_name, employeeProfile?.last_name].filter(Boolean).join(" ") ||
+                    currentUser?.email?.split("@")[0] ||
+                    "Employee"}
+            </h3>
+            <p>
+                {employmentInfo?.designation || employeeProfile?.designation || "Employee"} ·{" "}
+                {employmentInfo?.department || employeeProfile?.department || "Engineering"} /{" "}
+                {employmentInfo?.team || employeeProfile?.team || "Backend"}
+            </p>
             <div className="es-profile-tags">
-                <span><i className="bi bi-person-badge"></i> EMP-000124</span>
-                <span><i className="bi bi-geo-alt"></i> Chennai</span>
+                <span><i className="bi bi-person-badge"></i> {employmentInfo?.employee_code || employeeProfile?.employee_code || "—"}</span>
+                <span><i className="bi bi-geo-alt"></i> {contactInfo?.current_city || employeeProfile?.city || "—"}</span>
                 <span className="es-active-tag"><i className="bi bi-check-circle-fill"></i> Active</span>
             </div>
         </div>
         <div className="es-profile-completion">
             <div className="es-completion-top">
                 <span>Profile Completion</span>
-                <strong>85%</strong>
+                <strong>{employeeProfile?.profile_completion_percentage || 0}%</strong>
             </div>
             <div className="progress es-progress">
-                <div className="progress-bar" style={{width: "85%"}}></div>
+                <div className="progress-bar" style={{width: `${employeeProfile?.profile_completion_percentage || 0}%`}}></div>
             </div>
             <small>Complete your remaining profile details.</small>
         </div>
@@ -810,7 +845,7 @@ export default function Settings({ currentUser }) {
                     <div className="es-info-item"><span>First Name</span><strong>{displayValue(personalInfo?.first_name)}</strong></div>
                     <div className="es-info-item"><span>Middle Name</span><strong>{displayValue(personalInfo?.middle_name)}</strong></div>
                     <div className="es-info-item"><span>Last Name</span><strong>{displayValue(personalInfo?.last_name)}</strong></div>
-                    <div className="es-info-item"><span>Preferred Name</span><strong>{displayValue(personalInfo?.first_name)}</strong></div>
+                    <div className="es-info-item"><span>Preferred Name</span><strong>{displayValue(personalInfo?.preferred_name || (currentUser?.id && localStorage.getItem(`hrms_preferred_name_${currentUser.id}`)) || personalInfo?.first_name)}</strong></div>
                     <div className="es-info-item"><span>Date of Birth</span><strong>{dateOfBirth}</strong></div>
                     <div className="es-info-item"><span>Gender</span><strong>{displayValue(personalInfo?.gender)}</strong></div>
                     <div className="es-info-item"><span>Marital Status</span><strong>{displayValue(personalInfo?.marital_status)}</strong></div>
@@ -1425,8 +1460,7 @@ export default function Settings({ currentUser }) {
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="personalEditPreferredName">Preferred Name</label>
-                        <input id="personalEditPreferredName" className="form-control" name="preferredName" value={personalEditForm.preferredName} readOnly />
-                        <small className="text-muted">Preferred Name follows First Name because it has no separate database field.</small>
+                        <input id="personalEditPreferredName" className="form-control" name="preferredName" value={personalEditForm.preferredName} onChange={updatePersonalEditField} placeholder="Enter preferred name" />
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="personalEditDateOfBirth">Date of Birth</label>

@@ -206,6 +206,64 @@ export default function Calendar({ employeeProfile, currentUser }) {
                 </div>
               </div>
 
+              <section className="ed-hero" style={{ marginBottom: "25px" }}>
+                <div className="ed-hero-main">
+                  <div className="ed-profile-avatar">
+                    <img src="https://i.pravatar.cc/150?img=12" alt={profile?.preferred_name || profile?.first_name || "Employee"} />
+                    <span className="ed-online-dot"></span>
+                  </div>
+
+                  <div className="ed-hero-content">
+                    <span className="ed-eyebrow">
+                      <i className="bi bi-sun"></i>
+                      {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                    </span>
+
+                    <h1>
+                      Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"},{" "}
+                      {profile?.preferred_name || profile?.first_name || currentUser?.email?.split("@")[0] || "Employee"}
+                    </h1>
+
+                    <p>
+                      Here's your workspace overview for today. Stay productive and have a great day.
+                    </p>
+
+                    <div className="ed-employee-meta">
+                      <span>
+                        <i className="bi bi-person-badge"></i>
+                        {profile?.employee_code || "—"}
+                      </span>
+
+                      <span>
+                        <i className="bi bi-briefcase"></i>
+                        {profile?.designation || "—"}
+                      </span>
+
+                      <span>
+                        <i className="bi bi-diagram-3"></i>
+                        {profile?.department ? `${profile.department}${profile.team ? ` · ${profile.team}` : " · Backend"}` : "Engineering · Backend"}
+                      </span>
+
+                      <span>
+                        <i className="bi bi-geo-alt"></i>
+                        {profile?.city || "—"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="es-profile-completion">
+                  <div className="es-completion-top">
+                    <span>Profile Completion</span>
+                    <strong>{profile?.profile_completion_percentage || 0}%</strong>
+                  </div>
+                  <div className="progress es-progress">
+                    <div className="progress-bar" style={{ width: (profile?.profile_completion_percentage || 0) + "%" }}></div>
+                  </div>
+                  <small>Complete your remaining profile details.</small>
+                </div>
+              </section>
+
               <div className="calendar-summary">
                 <div className="summary-item">
                   <div className="summary-icon purple">

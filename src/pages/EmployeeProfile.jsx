@@ -10,7 +10,7 @@ const formatDate = (value) => {
         : date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 };
 
-export default function EmployeeProfile({ currentUser }) {
+export default function EmployeeProfile({ currentUser, employeeProfile }) {
     const [personalInfo, setPersonalInfo] = useState(null);
     const [contactInfo, setContactInfo] = useState(null);
     const [profile, setProfile] = useState(null);
@@ -55,28 +55,30 @@ export default function EmployeeProfile({ currentUser }) {
 
     const fullName = personalInfo
         ? [personalInfo.first_name, personalInfo.middle_name, personalInfo.last_name].filter(Boolean).join(" ")
-        : "";
+        : [employeeProfile?.first_name, employeeProfile?.middle_name, employeeProfile?.last_name].filter(Boolean).join(" ");
+    const displayName = personalInfo?.preferred_name || fullName || employeeProfile?.preferred_name || employeeProfile?.first_name || currentUser?.email?.split("@")[0] || "Employee";
+    const bannerInitials = (displayName.split(" ").map(w => w[0]).join("").slice(0, 2) || "EM").toUpperCase();
     const location = contactInfo
         ? [contactInfo.current_city, contactInfo.current_state, contactInfo.current_country].filter(Boolean).join(", ")
-        : "";
+        : (employeeProfile?.city || "");
     const personalItems = [
         { label: "Full Name", value: fullName },
-        { label: "Employee ID", value: profile?.employee_code },
-        { label: "Email", value: contactInfo?.work_email || profile?.email },
+        { label: "Employee ID", value: profile?.employee_code || employeeProfile?.employee_code },
+        { label: "Email", value: contactInfo?.work_email || profile?.email || currentUser?.email },
         { label: "Phone", value: contactInfo?.phone_number },
         { label: "Date of Birth", value: personalInfo?.date_of_birth ? formatDate(personalInfo.date_of_birth) : "" },
         { label: "Location", value: location },
     ];
 
     const employmentItems = [
-        { label: "Department", value: employmentInfo?.department },
-        { label: "Team", value: employmentInfo?.team },
-        { label: "Designation", value: employmentInfo?.designation },
+        { label: "Department", value: employmentInfo?.department || employeeProfile?.department },
+        { label: "Team", value: employmentInfo?.team || employeeProfile?.team },
+        { label: "Designation", value: employmentInfo?.designation || employeeProfile?.designation },
         { label: "Manager", value: employmentInfo?.reporting_manager },
-        { label: "Joining Date", value: employmentInfo?.joining_date ? formatDate(employmentInfo.joining_date) : "" },
-        { label: "Employment Type", value: employmentInfo?.employment_type },
-        { label: "Work Mode", value: employmentInfo?.work_mode },
-        { label: "Location", value: employmentInfo?.office_location },
+        { label: "Joining Date", value: (employmentInfo?.joining_date || employeeProfile?.joining_date) ? formatDate(employmentInfo?.joining_date || employeeProfile?.joining_date) : "" },
+        { label: "Employment Type", value: employmentInfo?.employment_type || employeeProfile?.employment_type },
+        { label: "Work Mode", value: employmentInfo?.work_mode || employeeProfile?.work_mode },
+        { label: "Location", value: employmentInfo?.office_location || employeeProfile?.city },
     ];
 
   return (
@@ -108,34 +110,34 @@ export default function EmployeeProfile({ currentUser }) {
                         <div className="esc-employee-main">
 
                             <div className="esc-avatar">
-                                AK
+                                {bannerInitials}
                             </div>
 
                             <div className="esc-employee-info">
                                 <div className="esc-name-row">
-                                    <h3>Anil Kumar</h3>
+                                    <h3>{displayName}</h3>
                                     <span className="esc-status-badge">
                                         <span></span>
                                         Active
                                     </span>
                                 </div>
 
-                                <p>Senior Software Engineer</p>
+                                <p>{employmentInfo?.designation || profile?.designation || employeeProfile?.designation || "Employee"}</p>
 
                                 <div className="esc-employee-meta">
                                     <span>
                                         <i className="bi bi-diagram-3"></i>
-                                        Engineering
+                                        {employmentInfo?.department || profile?.department || employeeProfile?.department || "Engineering"}
                                     </span>
 
                                     <span>
                                         <i className="bi bi-code-slash"></i>
-                                        Backend
+                                        {employmentInfo?.team || profile?.team || employeeProfile?.team || "Backend"}
                                     </span>
 
                                     <span>
                                         <i className="bi bi-person-badge"></i>
-                                        EMP-000124
+                                        {profile?.employee_code || employeeProfile?.employee_code || "—"}
                                     </span>
                                 </div>
                             </div>

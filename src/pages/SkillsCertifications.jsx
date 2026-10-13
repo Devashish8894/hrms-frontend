@@ -43,7 +43,7 @@ const EMPTY_SKILL_FORM = {
   lastUsed: "",
 };
 
-export default function SkillsCertifications({ currentUser }) {
+export default function SkillsCertifications({ currentUser, employeeProfile }) {
   const [isCertOpen, setIsCertOpen] = useState(false);
   const [certForm, setCertForm] = useState(EMPTY_CERT_FORM);
   const [certFile, setCertFile] = useState(null);
@@ -351,34 +351,39 @@ export default function SkillsCertifications({ currentUser }) {
                             <div className="esc-employee-main">
 
                                 <div className="esc-avatar">
-                                    AK
+                                    {(employeeProfile?.preferred_name
+                                        ? employeeProfile.preferred_name.slice(0, 2)
+                                        : employeeProfile?.first_name
+                                            ? `${employeeProfile.first_name[0]}${employeeProfile.last_name ? employeeProfile.last_name[0] : (employeeProfile.first_name[1] || "")}`
+                                            : currentUser?.email ? currentUser.email.slice(0, 2) : "EM"
+                                    ).toUpperCase()}
                                 </div>
 
                                 <div className="esc-employee-info">
                                     <div className="esc-name-row">
-                                        <h3>Anil Kumar</h3>
+                                        <h3>{employeeProfile?.preferred_name || [employeeProfile?.first_name, employeeProfile?.last_name].filter(Boolean).join(" ") || currentUser?.email?.split("@")[0] || "Employee"}</h3>
                                         <span className="esc-status-badge">
                                             <span></span>
                                             Active
                                         </span>
                                     </div>
 
-                                    <p>Senior Software Engineer</p>
+                                    <p>{employeeProfile?.designation || "Employee"}</p>
 
                                     <div className="esc-employee-meta">
                                         <span>
                                             <i className="bi bi-diagram-3"></i>
-                                            Engineering
+                                            {employeeProfile?.department || "Engineering"}
                                         </span>
 
                                         <span>
                                             <i className="bi bi-code-slash"></i>
-                                            Backend
+                                            {employeeProfile?.team || "Backend"}
                                         </span>
 
                                         <span>
                                             <i className="bi bi-person-badge"></i>
-                                            EMP-000124
+                                            {employeeProfile?.employee_code || "—"}
                                         </span>
                                     </div>
                                 </div>

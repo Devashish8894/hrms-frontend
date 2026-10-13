@@ -18,7 +18,7 @@ import HRAssistant from "./components/HRAssistant";
 export default function EmployeeTemplate({
   currentUser, handleLogout,
   attendanceStatus, checkInTime, checkOutTime, workingTime,
-  attendanceLoading, handleCheckIn, handleCheckOut, fetchAttendance, employeeProfile, attendanceStats, fetchAttendanceStats
+  attendanceLoading, handleCheckIn, handleCheckOut, fetchAttendance, employeeProfile, fetchEmployeeProfile, attendanceStats, fetchAttendanceStats
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activePage, setActivePage] = useState("index");
@@ -378,10 +378,12 @@ export default function EmployeeTemplate({
                       <i className="bi bi-laptop"></i>
                       <span>Assets</span>
                   </span>
+                  {/*
                   <span onClick={() => navigateTo("access-accounts")} className="menu-item" style={{cursor:"pointer"}}>
                       <i className="bi bi-shield-lock"></i>
                       <span>Access & Accounts</span>
                   </span>
+                  */}
 
                   <span className="menu-label" style={{ fontSize: '11px', fontWeight: 700, color: '#8a90a2', marginLeft: '22px', marginBottom: '8px', display: 'block', marginTop: '24px', letterSpacing: '0.5px' }}>COMMUNICATION</span>
                   <span onClick={() => navigateTo("calendar")} className="menu-item" style={{cursor:"pointer"}}>
@@ -474,7 +476,7 @@ export default function EmployeeTemplate({
                         </button>
 
 
-                        <button className="header-action">
+                        <button className="header-action" onClick={() => navigateTo("notifications")}>
 
                             <i className="bi bi-bell"></i>
 
@@ -487,13 +489,20 @@ export default function EmployeeTemplate({
 
                             <button className="profile-button" data-bs-toggle="dropdown">
 
-                                <div className="profile-avatar">{currentUser.email.slice(0, 2).toUpperCase()}</div>
+                                <div className="profile-avatar">
+                                    {(employeeProfile?.preferred_name
+                                        ? employeeProfile.preferred_name.slice(0, 2)
+                                        : employeeProfile?.first_name
+                                            ? `${employeeProfile.first_name[0]}${employeeProfile.last_name ? employeeProfile.last_name[0] : (employeeProfile.first_name[1] || "")}`
+                                            : currentUser.email.slice(0, 2)
+                                    ).toUpperCase()}
+                                </div>
 
                                 <div className="profile-info">
 
-                                    <h6>{currentUser.email}</h6>
+                                    <h6>{employeeProfile?.preferred_name || employeeProfile?.first_name || currentUser.email.split("@")[0]}</h6>
 
-                                    <span className="text-nowrap">{employeeProfile?.role_name || "Employee"}</span>
+                                    <span className="text-nowrap">{employeeProfile?.designation || employeeProfile?.role_name || "Employee"}</span>
 
                                 </div>
 
@@ -505,14 +514,14 @@ export default function EmployeeTemplate({
                             <ul className="dropdown-menu dropdown-menu-end border-0 shadow rounded-4 p-2">
 
                                 <li>
-                                    <a className="dropdown-item rounded-3 py-2" href="#">
+                                    <a className="dropdown-item rounded-3 py-2" href="#!" onClick={(e) => { e.preventDefault(); navigateTo("employee-profile"); }}>
                                         <i className="bi bi-person me-2"></i>
                                         My Profile
                                     </a>
                                 </li>
 
                                 <li>
-                                    <a className="dropdown-item rounded-3 py-2" href="#">
+                                    <a className="dropdown-item rounded-3 py-2" href="#!" onClick={(e) => { e.preventDefault(); navigateTo("settings"); }}>
                                         <i className="bi bi-gear me-2"></i>
                                         Settings
                                     </a>
@@ -523,7 +532,7 @@ export default function EmployeeTemplate({
                                 </li>
 
                                 <li>
-                                    <a className="dropdown-item rounded-3 py-2 text-danger" href="#">
+                                    <a className="dropdown-item rounded-3 py-2 text-danger" href="#!" onClick={(e) => { e.preventDefault(); handleLogout(); }}>
                                         <i className="bi bi-box-arrow-right me-2"></i>
                                         Logout
                                     </a>
@@ -598,7 +607,7 @@ export default function EmployeeTemplate({
                     <section className="ed-hero">
                         <div className="ed-hero-main">
                             <div className="ed-profile-avatar">
-                                <img src="https://i.pravatar.cc/150?img=12" alt="Anil Kumar" />
+                                <img src="https://i.pravatar.cc/150?img=12" alt={employeeProfile?.preferred_name || employeeProfile?.first_name || "Employee"} />
                                 <span className="ed-online-dot"></span>
                             </div>
 
@@ -608,7 +617,7 @@ export default function EmployeeTemplate({
                                     {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                                 </span>
 
-                                <h1>Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, {employeeProfile ? (employeeProfile.first_name || currentUser.email.split("@")[0]) : currentUser.email.split("@")[0]}</h1>
+                                <h1>Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, {employeeProfile ? (employeeProfile.preferred_name || employeeProfile.first_name || currentUser.email.split("@")[0]) : currentUser.email.split("@")[0]}</h1>
 
                                 <p>
                                     Here's your workspace overview for today.
@@ -618,22 +627,22 @@ export default function EmployeeTemplate({
                                 <div className="ed-employee-meta">
                                     <span>
 <i className="bi bi-person-badge"></i>
-{employeeProfile?.employee_code || "�"}
+{employeeProfile?.employee_code || "—"}
 </span>
 
                                     <span>
 <i className="bi bi-briefcase"></i>
-{employeeProfile?.designation || "�"}
+{employeeProfile?.designation || "—"}
 </span>
 
                                     <span>
                                         <i className="bi bi-diagram-3"></i>
-                                        Engineering · Backend
+                                        {employeeProfile?.department ? `${employeeProfile.department}${employeeProfile.team ? ` · ${employeeProfile.team}` : " · Backend"}` : "Engineering · Backend"}
                                     </span>
 
                                     <span>
 <i className="bi bi-geo-alt"></i>
-{employeeProfile?.city || "�"}
+{employeeProfile?.city || "—"}
 </span>
                                 </div>
                             </div>
@@ -1607,7 +1616,7 @@ export default function EmployeeTemplate({
             </div>
   </>
 )}
-{activePage === "employee-profile" && <EmployeeProfile currentUser={currentUser} employeeProfile={employeeProfile} />}
+{activePage === "employee-profile" && <EmployeeProfile currentUser={currentUser} employeeProfile={employeeProfile} onProfileUpdate={fetchEmployeeProfile} />}
 {activePage === "employement-details" && <EmploymentDetails employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "documents" && <Documents employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "skills-certifications" && <SkillsCertifications employeeProfile={employeeProfile} currentUser={currentUser} />}
@@ -1616,7 +1625,7 @@ export default function EmployeeTemplate({
 {activePage === "assets" && <Assets employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "access-accounts" && <AccessAccounts employeeProfile={employeeProfile} />}
 {activePage === "notifications" && <Notifications employeeProfile={employeeProfile} />}
-{activePage === "settings" && <Settings employeeProfile={employeeProfile} currentUser={currentUser} />}
+{activePage === "settings" && <Settings employeeProfile={employeeProfile} currentUser={currentUser} onProfileUpdate={fetchEmployeeProfile} />}
 {activePage === "exit-management" && <ExitManagement employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "employee-requests" && <EmployeeRequests employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "calendar" && <Calendar employeeProfile={employeeProfile} currentUser={currentUser} />}
