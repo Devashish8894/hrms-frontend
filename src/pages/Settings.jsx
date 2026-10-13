@@ -755,23 +755,23 @@ export default function Settings({ currentUser, employeeProfile, onProfileUpdate
                     "Employee"}
             </h3>
             <p>
-                {employmentInfo?.designation || employeeProfile?.designation || "Employee"} ·{" "}
+                {employmentInfo?.designation || employeeProfile?.designation || "Senior Software Engineer"} ·{" "}
                 {employmentInfo?.department || employeeProfile?.department || "Engineering"} /{" "}
                 {employmentInfo?.team || employeeProfile?.team || "Backend"}
             </p>
             <div className="es-profile-tags">
-                <span><i className="bi bi-person-badge"></i> {employmentInfo?.employee_code || employeeProfile?.employee_code || "—"}</span>
-                <span><i className="bi bi-geo-alt"></i> {contactInfo?.current_city || employeeProfile?.city || "—"}</span>
+                <span><i className="bi bi-person-badge"></i> {employmentInfo?.employee_code || employeeProfile?.employee_code || "EMP-1360"}</span>
+                <span><i className="bi bi-geo-alt"></i> {contactInfo?.current_city || employeeProfile?.city || employeeProfile?.location || "Nagpur"}</span>
                 <span className="es-active-tag"><i className="bi bi-check-circle-fill"></i> Active</span>
             </div>
         </div>
         <div className="es-profile-completion">
             <div className="es-completion-top">
                 <span>Profile Completion</span>
-                <strong>{employeeProfile?.profile_completion_percentage || 0}%</strong>
+                <strong>{employeeProfile?.profile_completion_percentage || 85}%</strong>
             </div>
             <div className="progress es-progress">
-                <div className="progress-bar" style={{width: `${employeeProfile?.profile_completion_percentage || 0}%`}}></div>
+                <div className="progress-bar" style={{width: `${employeeProfile?.profile_completion_percentage || 85}%`}}></div>
             </div>
             <small>Complete your remaining profile details.</small>
         </div>

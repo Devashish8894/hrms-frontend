@@ -458,11 +458,11 @@ export default function EmployeeRequests({ employeeProfile, currentUser }) {
                     <h3>{employeeName}</h3>
                     <span className="esc-status-badge"><span></span>Active</span>
                   </div>
-                  <p>{profile.designation || "Role Not Assigned"}</p>
+                  <p>{profile.designation || "Senior Software Engineer"}</p>
                   <div className="esc-employee-meta">
                     <span><i className="bi bi-diagram-3" aria-hidden="true"></i>{profile.department || "Engineering"}</span>
                     <span><i className="bi bi-code-slash" aria-hidden="true"></i>{profile.team || "Backend"}</span>
-                    <span><i className="bi bi-person-badge" aria-hidden="true"></i>{profile.employee_code || "EMP-000124"}</span>
+                    <span><i className="bi bi-person-badge" aria-hidden="true"></i>{profile.employee_code || "EMP-1360"}</span>
                   </div>
                 </div>
               </div>

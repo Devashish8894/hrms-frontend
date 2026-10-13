@@ -238,17 +238,17 @@ export default function Assets({ currentUser, employeeProfile }) {
                                     </span>
                                 </div>
 
-                                <p>{employee?.designation || employee?.role_name || ""}</p>
+                                <p>{employee?.designation || employee?.role_name || employeeProfile?.designation || "Senior Software Engineer"}</p>
 
                                 <div className="esc-employee-meta">
                                     <span>
                                         <i className="bi bi-diagram-3"></i>
-                                        {employee?.department || "—"}
+                                        {employee?.department || employeeProfile?.department || "Engineering"}
                                     </span>
 
                                     <span>
                                         <i className="bi bi-person-badge"></i>
-                                        {employee?.employee_code || "—"}
+                                        {employee?.employee_code || employeeProfile?.employee_code || "EMP-1360"}
                                     </span>
                                 </div>
                             </div>

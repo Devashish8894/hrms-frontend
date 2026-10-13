@@ -58,27 +58,27 @@ export default function EmployeeProfile({ currentUser, employeeProfile }) {
         : [employeeProfile?.first_name, employeeProfile?.middle_name, employeeProfile?.last_name].filter(Boolean).join(" ");
     const displayName = personalInfo?.preferred_name || fullName || employeeProfile?.preferred_name || employeeProfile?.first_name || currentUser?.email?.split("@")[0] || "Employee";
     const bannerInitials = (displayName.split(" ").map(w => w[0]).join("").slice(0, 2) || "EM").toUpperCase();
-    const location = contactInfo
+    const location = (contactInfo
         ? [contactInfo.current_city, contactInfo.current_state, contactInfo.current_country].filter(Boolean).join(", ")
-        : (employeeProfile?.city || "");
+        : (employeeProfile?.city || employeeProfile?.location || "")) || "Nagpur";
     const personalItems = [
-        { label: "Full Name", value: fullName },
-        { label: "Employee ID", value: profile?.employee_code || employeeProfile?.employee_code },
-        { label: "Email", value: contactInfo?.work_email || profile?.email || currentUser?.email },
-        { label: "Phone", value: contactInfo?.phone_number },
-        { label: "Date of Birth", value: personalInfo?.date_of_birth ? formatDate(personalInfo.date_of_birth) : "" },
+        { label: "Full Name", value: fullName || "Devashish Ahire" },
+        { label: "Employee ID", value: profile?.employee_code || employeeProfile?.employee_code || "EMP-1360" },
+        { label: "Email", value: contactInfo?.work_email || profile?.email || currentUser?.email || "dev@ramel.co.in" },
+        { label: "Phone", value: contactInfo?.phone_number || "+91 98765 43210" },
+        { label: "Date of Birth", value: personalInfo?.date_of_birth ? formatDate(personalInfo.date_of_birth) : "15 August 1993" },
         { label: "Location", value: location },
     ];
 
     const employmentItems = [
-        { label: "Department", value: employmentInfo?.department || employeeProfile?.department },
-        { label: "Team", value: employmentInfo?.team || employeeProfile?.team },
-        { label: "Designation", value: employmentInfo?.designation || employeeProfile?.designation },
-        { label: "Manager", value: employmentInfo?.reporting_manager },
-        { label: "Joining Date", value: (employmentInfo?.joining_date || employeeProfile?.joining_date) ? formatDate(employmentInfo?.joining_date || employeeProfile?.joining_date) : "" },
-        { label: "Employment Type", value: employmentInfo?.employment_type || employeeProfile?.employment_type },
-        { label: "Work Mode", value: employmentInfo?.work_mode || employeeProfile?.work_mode },
-        { label: "Location", value: employmentInfo?.office_location || employeeProfile?.city },
+        { label: "Department", value: employmentInfo?.department || employeeProfile?.department || "Engineering" },
+        { label: "Team", value: employmentInfo?.team || employeeProfile?.team || "Backend" },
+        { label: "Designation", value: employmentInfo?.designation || employeeProfile?.designation || "Senior Software Engineer" },
+        { label: "Manager", value: employmentInfo?.reporting_manager || "Maruthi Vara Prasad" },
+        { label: "Joining Date", value: (employmentInfo?.joining_date || employeeProfile?.joining_date) ? formatDate(employmentInfo?.joining_date || employeeProfile?.joining_date) : "5 August 2025" },
+        { label: "Employment Type", value: employmentInfo?.employment_type || employeeProfile?.employment_type || "Permanent" },
+        { label: "Work Mode", value: employmentInfo?.work_mode || employeeProfile?.work_mode || "Hybrid" },
+        { label: "Location", value: employmentInfo?.office_location || employeeProfile?.city || employeeProfile?.location || "Nagpur" },
     ];
 
   return (

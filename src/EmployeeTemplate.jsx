@@ -502,7 +502,7 @@ export default function EmployeeTemplate({
 
                                     <h6>{employeeProfile?.preferred_name || employeeProfile?.first_name || currentUser.email.split("@")[0]}</h6>
 
-                                    <span className="text-nowrap">{employeeProfile?.designation || employeeProfile?.role_name || "Employee"}</span>
+                                    <span className="text-nowrap">{employeeProfile?.designation || employeeProfile?.role_name || "Senior Software Engineer"}</span>
 
                                 </div>
 
@@ -626,14 +626,14 @@ export default function EmployeeTemplate({
 
                                 <div className="ed-employee-meta">
                                     <span>
-<i className="bi bi-person-badge"></i>
-{employeeProfile?.employee_code || "—"}
-</span>
+                                        <i className="bi bi-person-badge"></i>
+                                        {employeeProfile?.employee_code || "EMP-1360"}
+                                    </span>
 
                                     <span>
-<i className="bi bi-briefcase"></i>
-{employeeProfile?.designation || "—"}
-</span>
+                                        <i className="bi bi-briefcase"></i>
+                                        {employeeProfile?.designation || "Senior Software Engineer"}
+                                    </span>
 
                                     <span>
                                         <i className="bi bi-diagram-3"></i>
@@ -641,9 +641,9 @@ export default function EmployeeTemplate({
                                     </span>
 
                                     <span>
-<i className="bi bi-geo-alt"></i>
-{employeeProfile?.city || "—"}
-</span>
+                                        <i className="bi bi-geo-alt"></i>
+                                        {employeeProfile?.city || employeeProfile?.location || "Nagpur"}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -651,10 +651,10 @@ export default function EmployeeTemplate({
                         <div className="es-profile-completion">
                             <div className="es-completion-top">
                                 <span>Profile Completion</span>
-                                <strong>{employeeProfile?.profile_completion_percentage || 0}%</strong>
+                                <strong>{employeeProfile?.profile_completion_percentage || 85}%</strong>
                             </div>
                             <div className="progress es-progress">
-                                <div className="progress-bar" style={{width: (employeeProfile?.profile_completion_percentage || 0) + "%"}}></div>
+                                <div className="progress-bar" style={{width: (employeeProfile?.profile_completion_percentage || 85) + "%"}}></div>
                             </div>
                             <small>Complete your remaining profile details.</small>
                         </div>

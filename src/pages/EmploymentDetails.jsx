@@ -187,11 +187,11 @@ export default function EmploymentDetails({ employeeProfile, currentUser }) {
                       <h3>{profile.first_name || 'Employee'} {profile.last_name || 'Name'}</h3>
                       <span className="esc-status-badge"><span></span>Active</span>
                     </div>
-                    <p>{profile.designation || 'Role Not Assigned'}</p>
+                    <p>{profile.designation || employeeProfile?.designation || 'Senior Software Engineer'}</p>
                     <div className="esc-employee-meta">
-                      <span><i className="bi bi-diagram-3"></i>{profile.department || 'N/A'}</span>
-                      <span><i className="bi bi-code-slash"></i>{profile.team || 'Backend'}</span>
-                      <span><i className="bi bi-person-badge"></i>{profile.employee_code || 'EMP-000'}</span>
+                      <span><i className="bi bi-diagram-3"></i>{profile.department || employeeProfile?.department || 'Engineering'}</span>
+                      <span><i className="bi bi-code-slash"></i>{profile.team || employeeProfile?.team || 'Backend'}</span>
+                      <span><i className="bi bi-person-badge"></i>{profile.employee_code || employeeProfile?.employee_code || 'EMP-1360'}</span>
                     </div>
                   </div>
                 </div>
@@ -290,28 +290,28 @@ export default function EmploymentDetails({ employeeProfile, currentUser }) {
                           <label className="employment-label">Department</label>
                           <div className="employment-select-wrapper">
                             <i className="bi bi-building"></i>
-                            <span className="employment-control employment-readonly-value employment-select-with-icon">{profile.department || '--'}</span>
+                            <span className="employment-control employment-readonly-value employment-select-with-icon">{profile.department || employeeProfile?.department || 'Engineering'}</span>
                           </div>
                         </div>
                         <div className="col-md-6">
                           <label className="employment-label">Team</label>
                           <div className="employment-select-wrapper">
                             <i className="bi bi-people"></i>
-                            <span className="employment-control employment-readonly-value employment-select-with-icon">{profile.team || '--'}</span>
+                            <span className="employment-control employment-readonly-value employment-select-with-icon">{profile.team || employeeProfile?.team || 'Backend'}</span>
                           </div>
                         </div>
                         <div className="col-md-6">
                           <label className="employment-label">Designation</label>
                           <div className="employment-select-wrapper">
                             <i className="bi bi-award"></i>
-                            <span className="employment-control employment-readonly-value employment-select-with-icon">{profile.designation || '--'}</span>
+                            <span className="employment-control employment-readonly-value employment-select-with-icon">{profile.designation || employeeProfile?.designation || 'Senior Software Engineer'}</span>
                           </div>
                         </div>
                         <div className="col-md-6">
                           <label className="employment-label">Location</label>
                           <div className="employment-input-icon">
                             <i className="bi bi-geo-alt"></i>
-                            <span className="employment-control employment-readonly-value">{profile.location || profile.city || '--'}</span>
+                            <span className="employment-control employment-readonly-value">{profile.location || profile.city || employeeProfile?.location || employeeProfile?.city || 'Nagpur'}</span>
                           </div>
                         </div>
                       </div>

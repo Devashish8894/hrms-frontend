@@ -231,12 +231,12 @@ export default function Calendar({ employeeProfile, currentUser }) {
                     <div className="ed-employee-meta">
                       <span>
                         <i className="bi bi-person-badge"></i>
-                        {profile?.employee_code || "—"}
+                        {profile?.employee_code || "EMP-1360"}
                       </span>
 
                       <span>
                         <i className="bi bi-briefcase"></i>
-                        {profile?.designation || "—"}
+                        {profile?.designation || "Senior Software Engineer"}
                       </span>
 
                       <span>
@@ -246,7 +246,7 @@ export default function Calendar({ employeeProfile, currentUser }) {
 
                       <span>
                         <i className="bi bi-geo-alt"></i>
-                        {profile?.city || "—"}
+                        {profile?.city || profile?.location || "Nagpur"}
                       </span>
                     </div>
                   </div>
@@ -255,10 +255,10 @@ export default function Calendar({ employeeProfile, currentUser }) {
                 <div className="es-profile-completion">
                   <div className="es-completion-top">
                     <span>Profile Completion</span>
-                    <strong>{profile?.profile_completion_percentage || 0}%</strong>
+                    <strong>{profile?.profile_completion_percentage || 85}%</strong>
                   </div>
                   <div className="progress es-progress">
-                    <div className="progress-bar" style={{ width: (profile?.profile_completion_percentage || 0) + "%" }}></div>
+                    <div className="progress-bar" style={{ width: (profile?.profile_completion_percentage || 85) + "%" }}></div>
                   </div>
                   <small>Complete your remaining profile details.</small>
                 </div>

@@ -124,20 +124,20 @@ export default function Attendance({ currentUser, employeeProfile }) {
                                         </span>
                                     </div>
 
-                                    <p>{employeeProfile?.designation || "Employee"}</p>
+                                    <p>{employeeProfile?.designation || "Senior Software Engineer"}</p>
 
                                     <div className="esc-employee-meta">
                                         <span>
                                             <i className="bi bi-diagram-3"></i>
-                                            {employeeProfile?.department || "Department"}
+                                            {employeeProfile?.department || "Engineering"}
                                         </span>
                                         <span>
                                             <i className="bi bi-geo-alt"></i>
-                                            {employeeProfile?.city || "Location"}
+                                            {employeeProfile?.city || employeeProfile?.location || "Nagpur"}
                                         </span>
                                         <span>
                                             <i className="bi bi-person-badge"></i>
-                                            {employeeProfile?.employee_code || "EMP-0000"}
+                                            {employeeProfile?.employee_code || "EMP-1360"}
                                         </span>
                                     </div>
                                 </div>

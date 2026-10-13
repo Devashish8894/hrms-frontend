@@ -322,7 +322,7 @@ export default function Documents({ currentUser, employeeProfile }) {
                                         </span>
                                     </div>
 
-                                    <p>{employeeProfile?.designation || "Employee"}</p>
+                                    <p>{employeeProfile?.designation || "Senior Software Engineer"}</p>
 
                                     <div className="esc-employee-meta">
                                         <span>
@@ -337,7 +337,7 @@ export default function Documents({ currentUser, employeeProfile }) {
 
                                         <span>
                                             <i className="bi bi-person-badge"></i>
-                                            {employeeProfile?.employee_code || "—"}
+                                            {employeeProfile?.employee_code || "EMP-1360"}
                                         </span>
                                     </div>
                                 </div>

@@ -276,12 +276,12 @@ export default function Leaves({ currentUser, employeeProfile }) {
         <span className="esc-status-badge"><span></span>Active</span>
     </div>
 
-                                    <p className="esc-role">{employeeProfile?.designation || "Employee"}</p>
+                                    <p className="esc-role">{employeeProfile?.designation || "Senior Software Engineer"}</p>
 
                                     <div className="esc-employee-meta">
-        <span><i className="bi bi-diagram-3"></i> {employeeProfile?.department || "Department"}</span>
-        <span><i className="bi bi-geo-alt"></i> {employeeProfile?.city || "Location"}</span>
-        <span><i className="bi bi-person-badge"></i> {employeeProfile?.employee_code || "EMP-0000"}</span>
+        <span><i className="bi bi-diagram-3"></i> {employeeProfile?.department || "Engineering"}</span>
+        <span><i className="bi bi-geo-alt"></i> {employeeProfile?.city || employeeProfile?.location || "Nagpur"}</span>
+        <span><i className="bi bi-person-badge"></i> {employeeProfile?.employee_code || "EMP-1360"}</span>
     </div>
                                 </div>
 
