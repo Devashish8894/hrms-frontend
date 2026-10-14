@@ -348,20 +348,20 @@ export default function Settings({ currentUser, employeeProfile }) {
         return `${Number(parts[3])} ${month} ${parts[1]}`;
     };
     const openPersonalEdit = () => {
-        if (!personalInfo) return;
+        const info = personalInfo || {};
 
         setPersonalEditForm({
-            firstName: personalInfo.first_name || "",
-            middleName: personalInfo.middle_name || "",
-            lastName: personalInfo.last_name || "",
-            preferredName: personalInfo.first_name || "",
-            dateOfBirth: String(personalInfo.date_of_birth || "").slice(0, 10),
-            gender: personalInfo.gender
-                ? `${personalInfo.gender.charAt(0).toUpperCase()}${personalInfo.gender.slice(1)}`
+            firstName: info.first_name || currentUser?.email?.split('@')[0] || "",
+            middleName: info.middle_name || "",
+            lastName: info.last_name || "",
+            preferredName: info.first_name || currentUser?.email?.split('@')[0] || "",
+            dateOfBirth: String(info.date_of_birth || "").slice(0, 10),
+            gender: info.gender
+                ? `${info.gender.charAt(0).toUpperCase()}${info.gender.slice(1)}`
                 : "",
-            maritalStatus: personalInfo.marital_status || "",
-            nationality: personalInfo.nationality || "",
-            bloodGroup: personalInfo.blood_group || "",
+            maritalStatus: info.marital_status || "",
+            nationality: info.nationality || "Indian",
+            bloodGroup: info.blood_group || "",
         });
         setPersonalEditFeedback("");
         setIsPersonalEditOpen(true);
@@ -411,40 +411,40 @@ export default function Settings({ currentUser, employeeProfile }) {
         }
     };
     const openContactEdit = () => {
-        if (!contactInfo) return;
+        const info = contactInfo || {};
 
         const currentAddressValues = {
-            permanentAddress: contactInfo.current_address_line || "",
-            permanentCity: contactInfo.current_city || "",
-            permanentState: contactInfo.current_state || "",
-            permanentPostalCode: contactInfo.current_postal_code || "",
-            permanentCountry: contactInfo.current_country || "",
+            permanentAddress: info.current_address_line || "",
+            permanentCity: info.current_city || "",
+            permanentState: info.current_state || "",
+            permanentPostalCode: info.current_postal_code || "",
+            permanentCountry: info.current_country || "",
         };
         const addressIsSame = [
-            [contactInfo.current_address_line, contactInfo.permanent_address_line],
-            [contactInfo.current_city, contactInfo.permanent_city],
-            [contactInfo.current_state, contactInfo.permanent_state],
-            [contactInfo.current_postal_code, contactInfo.permanent_postal_code],
-            [contactInfo.current_country, contactInfo.permanent_country],
+            [info.current_address_line, info.permanent_address_line],
+            [info.current_city, info.permanent_city],
+            [info.current_state, info.permanent_state],
+            [info.current_postal_code, info.permanent_postal_code],
+            [info.current_country, info.permanent_country],
         ].every(([current, permanent]) => (current || "") === (permanent || ""));
 
         setContactEditForm({
-            workEmail: contactInfo.work_email || "",
-            personalEmail: contactInfo.personal_email || "",
-            mobile: contactInfo.phone_number || "",
-            alternatePhone: contactInfo.alternate_phone || "",
-            currentAddress: contactInfo.current_address_line || "",
-            currentCity: contactInfo.current_city || "",
-            currentState: contactInfo.current_state || "",
-            currentPostalCode: contactInfo.current_postal_code || "",
-            currentCountry: contactInfo.current_country || "",
+            workEmail: info.work_email || currentUser?.email || "",
+            personalEmail: info.personal_email || "",
+            mobile: info.phone_number || "",
+            alternatePhone: info.alternate_phone || "",
+            currentAddress: info.current_address_line || "",
+            currentCity: info.current_city || "",
+            currentState: info.current_state || "",
+            currentPostalCode: info.current_postal_code || "",
+            currentCountry: info.current_country || "India",
             sameAsCurrentAddress: addressIsSame,
-            ...((addressIsSame && contactInfo.current_address_line) ? currentAddressValues : {
-                permanentAddress: contactInfo.permanent_address_line || "",
-                permanentCity: contactInfo.permanent_city || "",
-                permanentState: contactInfo.permanent_state || "",
-                permanentPostalCode: contactInfo.permanent_postal_code || "",
-                permanentCountry: contactInfo.permanent_country || "",
+            ...((addressIsSame && info.current_address_line) ? currentAddressValues : {
+                permanentAddress: info.permanent_address_line || "",
+                permanentCity: info.permanent_city || "",
+                permanentState: info.permanent_state || "",
+                permanentPostalCode: info.permanent_postal_code || "",
+                permanentCountry: info.permanent_country || "India",
             }),
         });
         setContactEditFeedback("");
@@ -522,17 +522,17 @@ export default function Settings({ currentUser, employeeProfile }) {
         }
     };
     const openBankEdit = () => {
-        if (!bankInfo) return;
+        const info = bankInfo || {};
 
         setBankEditForm({
-            bankName: bankInfo.bank_name || "",
-            accountHolderName: bankInfo.account_holder_name || "",
-            accountNumber: fullAccountNumber,
-            confirmAccountNumber: fullAccountNumber,
-            ifscCode: bankInfo.ifsc_code || "",
-            branchName: bankInfo.branch_name || "",
-            accountType: bankInfo.account_type || "Savings",
-            reason: bankInfo.change_reason || "",
+            bankName: info.bank_name || "",
+            accountHolderName: info.account_holder_name || "",
+            accountNumber: fullAccountNumber || "",
+            confirmAccountNumber: fullAccountNumber || "",
+            ifscCode: info.ifsc_code || "",
+            branchName: info.branch_name || "",
+            accountType: info.account_type || "Savings",
+            reason: info.change_reason || "",
         });
         setBankEditFeedback("");
         setIsBankEditOpen(true);
