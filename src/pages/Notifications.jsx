@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5002";
+const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
 const FILTERS = ["All Notifications", "Unread", "Important", "Archived"];
 const CATEGORIES = ["Leave", "Attendance", "Requests", "Assets", "IT Access", "Documents", "HR Announcement", "Celebrations"];
 const ICONS = {

@@ -4,7 +4,7 @@ import './ems-styles.css';
 import EmployeeTemplate from './EmployeeTemplate';
 
 // const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost';
-const API_BASE = 'http://localhost:5002';
+const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
 
 const DEFAULT_EMPLOYEE = {
   firstName: '',
