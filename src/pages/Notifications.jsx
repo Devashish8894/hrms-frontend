@@ -1,339 +1,244 @@
-import React from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-export default function Notifications() {
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5002";
+const FILTERS = ["All Notifications", "Unread", "Important", "Archived"];
+const CATEGORIES = ["Leave", "Attendance", "Requests", "Assets", "IT Access", "Documents", "HR Announcement", "Celebrations"];
+const ICONS = {
+  Leave: "bi-calendar-check",
+  Attendance: "bi-clock-history",
+  Requests: "bi-inbox",
+  Assets: "bi-laptop",
+  "IT Access": "bi-shield-lock",
+  Documents: "bi-file-earmark-text",
+  "HR Announcement": "bi-megaphone",
+  Celebrations: "bi-stars"
+};
+const EMPTY_COUNTS = { total: 0, unread: 0, important: 0, read: 0, archived: 0 };
+
+function formatDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+export default function Notifications({ currentUser, adminView = false }) {
+  const userId = currentUser?.id;
+  const [notifications, setNotifications] = useState([]);
+  const [counts, setCounts] = useState(EMPTY_COUNTS);
+  const [activeFilter, setActiveFilter] = useState("All Notifications");
+  const [activeCategory, setActiveCategory] = useState("");
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState("");
+
+  const loadNotifications = useCallback(async (signal, showLoading = false) => {
+    if (!userId) {
+      setError("Unable to identify your account. Please sign in again.");
+      setLoading(false);
+      return;
+    }
+    if (showLoading) setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/notifications/${encodeURIComponent(userId)}`, { signal });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Unable to load notifications.");
+      setNotifications(Array.isArray(result.notifications) ? result.notifications : []);
+      setCounts({ ...EMPTY_COUNTS, ...(result.counts || {}) });
+      setError("");
+    } catch (loadError) {
+      if (loadError.name !== "AbortError") {
+        setError(loadError.message || "Unable to load notifications.");
+      }
+    } finally {
+      if (!signal?.aborted && showLoading) setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const refresh = () => {
+      if (document.visibilityState === "visible") loadNotifications(controller.signal);
+    };
+    loadNotifications(controller.signal, true);
+    const interval = window.setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [loadNotifications]);
+
+  const visibleNotifications = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return notifications.filter((notification) => {
+      const archived = Boolean(notification.is_archived);
+      if (activeFilter === "Archived" && !archived) return false;
+      if (activeFilter !== "Archived" && archived) return false;
+      if (activeFilter === "Unread" && notification.is_read) return false;
+      if (activeFilter === "Important" && !notification.is_important) return false;
+      if (activeCategory && notification.category !== activeCategory) return false;
+      if (query && !`${notification.title} ${notification.message} ${notification.category}`.toLowerCase().includes(query)) return false;
+      return true;
+    });
+  }, [notifications, activeFilter, activeCategory, search]);
+
+  const updateNotification = async (notification, update) => {
+    setBusyId(notification.id);
+    setError("");
+    try {
+      const response = await fetch(`${API_BASE}/api/notifications/${notification.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, ...update })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Unable to update notification.");
+      await loadNotifications();
+    } catch (updateError) {
+      setError(updateError.message || "Unable to update notification.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const markAllRead = async () => {
+    setError("");
+    try {
+      const response = await fetch(`${API_BASE}/api/notifications/${encodeURIComponent(userId)}/read-all`, {
+        method: "PATCH"
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Unable to mark notifications as read.");
+      await loadNotifications();
+    } catch (updateError) {
+      setError(updateError.message || "Unable to mark notifications as read.");
+    }
+  };
+
   return (
-    <>
-<div className="px-0 px-md-5 employee-dashboard">
+    <div className="px-0 px-md-5 employee-dashboard">
+      <div className="employee-notifications-page">
+        <div className="en-page-header">
+          <div>
+            <h2>{adminView ? "Admin Notifications" : "Notifications"}</h2>
+            <p>{adminView ? "New employee requests and asset returns for your organization." : "Live updates for your requests, approvals, assets, and HR."}</p>
+          </div>
+          <div className="en-header-actions">
+            <button className="btn en-btn-light" type="button" onClick={() => loadNotifications(undefined, true)} disabled={loading}>
+              <i className="bi bi-arrow-clockwise me-2"></i>Refresh
+            </button>
+            <button className="btn en-btn-primary" type="button" onClick={markAllRead} disabled={!counts.unread}>
+              <i className="bi bi-check2-all me-2"></i>Mark all as read
+            </button>
+          </div>
+        </div>
 
-                
-                <div className="employee-notifications-page">
+        {error && <div className="alert alert-danger" role="alert">{error}</div>}
 
-                    
-                    <div className="en-page-header">
-                        <div>
-                            <h2>Notifications</h2>
-                            <p>Stay updated with your work, requests, and important announcements.</p>
-                        </div>
+        <div className="en-welcome-banner">
+          <div className="en-welcome-icon"><i className="bi bi-bell-fill"></i></div>
+          <div className="en-welcome-content">
+            <span className="en-eyebrow">LIVE NOTIFICATION CENTER</span>
+            <h3>{adminView ? "Employee activity, all in one place." : "Every request update, all in one place."}</h3>
+            <p>{adminView ? "Review employee submissions and requests waiting for your team." : "Request submissions and administrator decisions appear here automatically."}</p>
+          </div>
+          <div className="en-banner-decoration"><i className="bi bi-bell"></i><i className="bi bi-stars"></i></div>
+        </div>
 
-                        <div className="en-header-actions">
-                            <button className="btn en-btn-light">
-                                <i className="bi bi-sliders2"></i>
-                                Preferences
-                            </button>
-                            <button className="btn en-btn-primary">
-                                <i className="bi bi-check2-all"></i>
-                                Mark all as read
-                            </button>
-                        </div>
-                    </div>
-
-                    
-                    <div className="en-welcome-banner">
-                        <div className="en-welcome-icon">
-                            <i className="bi bi-bell-fill"></i>
-                        </div>
-                        <div className="en-welcome-content">
-                            <span className="en-eyebrow">YOUR NOTIFICATION CENTER</span>
-                            <h3>Everything important, all in one place.</h3>
-                            <p>Track updates from HR, attendance, leave requests, and your team.</p>
-                        </div>
-                        <div className="en-banner-decoration">
-                            <i className="bi bi-bell"></i>
-                            <i className="bi bi-stars"></i>
-                        </div>
-                    </div>
-
-                    
-                    <div className="row g-3 en-summary-row">
-                        <div className="col-6 col-xl-3">
-                            <div className="en-summary-card">
-                                <div className="en-summary-icon en-icon-purple">
-                                    <i className="bi bi-bell"></i>
-                                </div>
-                                <div>
-                                    <span>Total Notifications</span>
-                                    <h3 id="enTotalCount">12</h3>
-                                    <small>Across all categories</small>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="col-6 col-xl-3">
-                            <div className="en-summary-card">
-                                <div className="en-summary-icon en-icon-blue">
-                                    <i className="bi bi-envelope"></i>
-                                </div>
-                                <div>
-                                    <span>Unread</span>
-                                    <h3 id="enUnreadCount">7</h3>
-                                    <small>Need your attention</small>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="col-6 col-xl-3">
-                            <div className="en-summary-card">
-                                <div className="en-summary-icon en-icon-orange">
-                                    <i className="bi bi-star"></i>
-                                </div>
-                                <div>
-                                    <span>Important</span>
-                                    <h3 id="enImportantCount">3</h3>
-                                    <small>Priority updates</small>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="col-6 col-xl-3">
-                            <div className="en-summary-card">
-                                <div className="en-summary-icon en-icon-green">
-                                    <i className="bi bi-check-circle"></i>
-                                </div>
-                                <div>
-                                    <span>Read</span>
-                                    <h3 id="enReadCount">5</h3>
-                                    <small>Already reviewed</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    
-                    <div className="en-workspace">
-
-                        
-                        <aside className="en-sidebar">
-                            <div className="en-sidebar-heading">NOTIFICATION BOX</div>
-
-                            <button className="en-nav-item active" data-filter="all">
-                                <span className="en-nav-icon"><i className="bi bi-inbox"></i></span>
-                                <span>All Notifications</span>
-                                <span className="en-nav-count" id="enNavAll">12</span>
-                            </button>
-
-                            <button className="en-nav-item" data-filter="unread">
-                                <span className="en-nav-icon"><i className="bi bi-envelope"></i></span>
-                                <span>Unread</span>
-                                <span className="en-nav-count" id="enNavUnread">7</span>
-                            </button>
-
-                            <button className="en-nav-item" data-filter="important">
-                                <span className="en-nav-icon"><i className="bi bi-star"></i></span>
-                                <span>Important</span>
-                                <span className="en-nav-count" id="enNavImportant">3</span>
-                            </button>
-
-                            <button className="en-nav-item" data-filter="archived">
-                                <span className="en-nav-icon"><i className="bi bi-archive"></i></span>
-                                <span>Archived</span>
-                                <span className="en-nav-count" id="enNavArchived">0</span>
-                            </button>
-
-                            <div className="en-sidebar-divider"></div>
-
-                            <div className="en-sidebar-heading">CATEGORIES</div>
-
-                            <button className="en-category-item" data-category="Leave">
-                                <span className="en-category-dot en-dot-purple"></span>
-                                Leave
-                            </button>
-                            <button className="en-category-item" data-category="Attendance">
-                                <span className="en-category-dot en-dot-blue"></span>
-                                Attendance
-                            </button>
-                            <button className="en-category-item" data-category="HR Announcement">
-                                <span className="en-category-dot en-dot-orange"></span>
-                                HR Announcements
-                            </button>
-                            <button className="en-category-item" data-category="Documents">
-                                <span className="en-category-dot en-dot-green"></span>
-                                Documents
-                            </button>
-                            <button className="en-category-item" data-category="Requests">
-                                <span className="en-category-dot en-dot-pink"></span>
-                                Requests
-                            </button>
-                            <button className="en-category-item" data-category="Assets">
-                                <span className="en-category-dot en-dot-gray"></span>
-                                Assets
-                            </button>
-                            <button className="en-category-item" data-category="IT Access">
-                                <span className="en-category-dot en-dot-cyan"></span>
-                                IT Access
-                            </button>
-                            <button className="en-category-item" data-category="Celebrations">
-                                <span className="en-category-dot en-dot-yellow"></span>
-                                Celebrations
-                            </button>
-
-                            <div className="en-sidebar-bottom">
-                                <div className="en-sidebar-bottom-icon">
-                                    <i className="bi bi-shield-check"></i>
-                                </div>
-                                <strong>Your updates, securely.</strong>
-                                <p>Notifications are connected to your employee workspace.</p>
-                            </div>
-                        </aside>
-
-                        
-                        <section className="en-feed">
-
-                            <div className="en-feed-header">
-                                <div>
-                                    <h4 id="enFeedTitle">All Notifications</h4>
-                                    <p id="enFeedSubtitle">Your latest updates and activity</p>
-                                </div>
-                                <button className="btn en-icon-button"
-                                    title="Notification preferences">
-                                    <i className="bi bi-gear"></i>
-                                </button>
-                            </div>
-
-                            
-                            <div className="en-toolbar">
-                                <div className="en-search">
-                                    <i className="bi bi-search"></i>
-                                    <input type="text" id="enSearch" placeholder="Search notifications..."
-                                        oninput="enRender()" />
-                                    <kbd>⌘ K</kbd>
-                                </div>
-
-                                <select className="form-select en-filter-select" id="enDateFilter" onchange="enRender()">
-                                    <option value="all">All dates</option>
-                                    <option value="today">Today</option>
-                                    <option value="week">Last 7 days</option>
-                                    <option value="month">Last 30 days</option>
-                                </select>
-
-                                <select className="form-select en-filter-select" id="enSortFilter" onchange="enRender()">
-                                    <option value="newest">Newest first</option>
-                                    <option value="oldest">Oldest first</option>
-                                </select>
-                            </div>
-
-                            
-                            <div className="en-active-filter" id="enActiveFilter" style={{display: "none"}}>
-                                <span id="enActiveFilterText"></span>
-                                <button title="Clear category filter">
-                                    <i className="bi bi-x-lg"></i>
-                                </button>
-                            </div>
-
-                            
-                            <div id="enNotificationFeed"></div>
-
-                            
-                            <div className="en-empty-state" id="enEmptyState" style={{display: "none"}}>
-                                <div className="en-empty-icon">
-                                    <i className="bi bi-bell-slash"></i>
-                                </div>
-                                <h4>You're all caught up!</h4>
-                                <p>No notifications match your current filters.</p>
-                                <button className="btn en-btn-primary">View all
-                                    notifications</button>
-                            </div>
-
-                            <div className="en-feed-footer">
-                                <span id="enResultCount">Showing 12 notifications</span>
-                                <button className="btn en-btn-light">Reset filters</button>
-                            </div>
-                        </section>
-                    </div>
-                </div>
-
-                
-                <div className="modal fade" id="enDetailsModal" tabIndex="-1" aria-hidden="true">
-                    <div className="modal-dialog modal-dialog-centered">
-                        <div className="modal-content en-modal-content">
-                            <div className="modal-header">
-                                <h5 className="modal-title">Notification Details</h5>
-                                <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div className="modal-body" id="enDetailsBody"></div>
-                            <div className="modal-footer">
-                                <button className="btn en-btn-light" data-bs-dismiss="modal">Close</button>
-                                <button className="btn en-btn-primary" id="enDetailsAction">Open Related Page</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                
-                <div className="modal fade" id="enPreferencesModal" tabIndex="-1" aria-hidden="true">
-                    <div className="modal-dialog modal-dialog-centered">
-                        <div className="modal-content en-modal-content">
-                            <div className="modal-header">
-                                <div>
-                                    <h5 className="modal-title">Notification Preferences</h5>
-                                    <p className="en-modal-subtitle">Choose which updates you want to see.</p>
-                                </div>
-                                <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-
-                            <div className="modal-body">
-                                <div className="en-preference-row">
-                                    <div><strong>Leave Updates</strong><small>Approvals, rejections, and
-                                            reminders</small></div>
-                                    <div className="form-check form-switch"><input className="form-check-input" type="checkbox"
-                                            checked data-pref="Leave" /></div>
-                                </div>
-                                <div className="en-preference-row">
-                                    <div><strong>Attendance</strong><small>Check-in reminders and corrections</small>
-                                    </div>
-                                    <div className="form-check form-switch"><input className="form-check-input" type="checkbox"
-                                            checked data-pref="Attendance" /></div>
-                                </div>
-                                <div className="en-preference-row">
-                                    <div><strong>HR Announcements</strong><small>Company news and policy updates</small>
-                                    </div>
-                                    <div className="form-check form-switch"><input className="form-check-input" type="checkbox"
-                                            checked data-pref="HR Announcement" /></div>
-                                </div>
-                                <div className="en-preference-row">
-                                    <div><strong>Documents</strong><small>Verification and document reminders</small>
-                                    </div>
-                                    <div className="form-check form-switch"><input className="form-check-input" type="checkbox"
-                                            checked data-pref="Documents" /></div>
-                                </div>
-                                <div className="en-preference-row">
-                                    <div><strong>Requests</strong><small>Employee request status updates</small></div>
-                                    <div className="form-check form-switch"><input className="form-check-input" type="checkbox"
-                                            checked data-pref="Requests" /></div>
-                                </div>
-                                <div className="en-preference-row">
-                                    <div><strong>Assets & IT Access</strong><small>Equipment and account access
-                                            updates</small></div>
-                                    <div className="form-check form-switch"><input className="form-check-input" type="checkbox"
-                                            checked data-pref="Assets,IT Access" /></div>
-                                </div>
-                                <div className="en-preference-row">
-                                    <div><strong>Celebrations</strong><small>Birthdays and work anniversaries</small>
-                                    </div>
-                                    <div className="form-check form-switch"><input className="form-check-input" type="checkbox"
-                                            checked data-pref="Celebrations" /></div>
-                                </div>
-                            </div>
-
-                            <div className="modal-footer">
-                                <button className="btn en-btn-light" data-bs-dismiss="modal">Cancel</button>
-                                <button className="btn en-btn-primary">Save
-                                    Preferences</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                
-                <div className="en-toast" id="enToast">
-                    <div className="en-toast-icon"><i className="bi bi-check-lg"></i></div>
-                    <div>
-                        <strong id="enToastTitle">Success</strong>
-                        <p id="enToastMessage">Action completed successfully.</p>
-                    </div>
-                    <button><i className="bi bi-x-lg"></i></button>
-                </div>
-
+        <div className="row g-3 en-summary-row">
+          {[
+            ["Total Notifications", counts.total, "bi-bell", "en-icon-purple"],
+            ["Unread", counts.unread, "bi-envelope", "en-icon-blue"],
+            ["Important", counts.important, "bi-star", "en-icon-orange"],
+            ["Read", counts.read, "bi-check-circle", "en-icon-green"]
+          ].map(([label, count, icon, color]) => (
+            <div className="col-6 col-xl-3" key={label}>
+              <div className="en-summary-card">
+                <div className={`en-summary-icon ${color}`}><i className={`bi ${icon}`}></i></div>
+                <div><span>{label}</span><h3>{count}</h3><small>Stored notifications</small></div>
+              </div>
             </div>
-    </>
+          ))}
+        </div>
+
+        <div className="en-workspace">
+          <aside className="en-sidebar">
+            <div className="en-sidebar-heading">INBOX</div>
+            {FILTERS.map((filter) => (
+              <button key={filter} className={`en-nav-item ${activeFilter === filter && !activeCategory ? "active" : ""}`} type="button" onClick={() => { setActiveFilter(filter); setActiveCategory(""); }}>
+                <span className="en-nav-icon"><i className={`bi ${filter === "Unread" ? "bi-envelope" : filter === "Important" ? "bi-star" : filter === "Archived" ? "bi-archive" : "bi-inbox"}`}></i></span>
+                <span>{filter}</span>
+                <span className="en-nav-count">{filter === "Unread" ? counts.unread : filter === "Important" ? counts.important : filter === "Archived" ? counts.archived : counts.total}</span>
+              </button>
+            ))}
+            <div className="en-sidebar-divider"></div>
+            <div className="en-sidebar-heading">CATEGORIES</div>
+            {CATEGORIES.map((category) => (
+              <button key={category} className={`en-category-item ${activeCategory === category ? "active" : ""}`} type="button" onClick={() => { setActiveCategory(activeCategory === category ? "" : category); setActiveFilter("All Notifications"); }}>
+                <span className="en-category-dot en-dot-purple"></span>{category}
+              </button>
+            ))}
+          </aside>
+
+          <section className="en-feed">
+            <div className="en-feed-header">
+              <div><h4>{activeCategory || activeFilter}</h4><p>{visibleNotifications.length} notification{visibleNotifications.length === 1 ? "" : "s"}</p></div>
+            </div>
+            <div className="en-toolbar">
+              <div className="en-search">
+                <i className="bi bi-search"></i>
+                <input type="search" aria-label="Search notifications" placeholder="Search notifications..." value={search} onChange={(event) => setSearch(event.target.value)} />
+              </div>
+            </div>
+            {loading ? (
+              <div className="text-center text-muted py-5"><span className="spinner-border spinner-border-sm me-2" role="status"></span>Loading notifications...</div>
+            ) : visibleNotifications.length ? visibleNotifications.map((notification) => (
+              <article key={notification.id} className={`en-notification ${notification.is_read ? "" : "unread"}`}>
+                <div className="en-notification-icon en-icon-purple"><i className={`bi ${ICONS[notification.category] || "bi-bell"}`}></i></div>
+                <div className="en-notification-main">
+                  <div className="en-notification-top">
+                    <h5 className="en-notification-title">{notification.title}</h5>
+                    {!notification.is_read && <span className="en-unread-badge">New</span>}
+                    {notification.is_important && <i className="bi bi-star-fill en-important-badge" title="Important"></i>}
+                  </div>
+                  <p className="en-notification-description">{notification.message}</p>
+                  <div className="en-notification-meta">
+                    <span className="en-category-label">{notification.category}</span>
+                    <span><i className="bi bi-clock"></i>{formatDate(notification.created_at)}</span>
+                  </div>
+                </div>
+                <div className="en-notification-actions">
+                  {!notification.is_archived && (
+                    <button type="button" className="en-action-btn" title={notification.is_read ? "Mark unread" : "Mark read"} aria-label={notification.is_read ? "Mark unread" : "Mark read"} disabled={busyId === notification.id} onClick={() => updateNotification(notification, { is_read: !notification.is_read })}>
+                      <i className={`bi ${notification.is_read ? "bi-envelope" : "bi-envelope-open"}`}></i>
+                    </button>
+                  )}
+                  <button type="button" className="en-action-btn" title={notification.is_archived ? "Restore" : "Archive"} aria-label={notification.is_archived ? "Restore notification" : "Archive notification"} disabled={busyId === notification.id} onClick={() => updateNotification(notification, { is_archived: !notification.is_archived })}>
+                    <i className={`bi ${notification.is_archived ? "bi-arrow-counterclockwise" : "bi-archive"}`}></i>
+                  </button>
+                </div>
+              </article>
+            )) : (
+              <div className="en-empty-state">
+                <div className="en-empty-icon"><i className="bi bi-bell-slash"></i></div>
+                <h4>{notifications.length ? "No notifications match this filter." : "No notifications yet."}</h4>
+                <p>New request activity and status updates will appear here.</p>
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
   );
 }

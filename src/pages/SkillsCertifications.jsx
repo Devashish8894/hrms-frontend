@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5002";
 
 const CATEGORY_STYLE = {
   Programming: { avatar: "esc-java", icon: "bi-code-slash" },
@@ -21,10 +21,18 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const CERT_LOGO_CLASSES = ["", "esc-cert-green", "esc-cert-orange"];
 
 const formatCertDate = (value) => {
-  if (!value) return "ΓÇö";
+  if (!value) return "—";
   const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return "ΓÇö";
+  if (Number.isNaN(date.getTime())) return "—";
   return `${String(date.getDate()).padStart(2, "0")}-${MONTHS[date.getMonth()]}-${date.getFullYear()}`;
+};
+const readApiResponse = async (response) => {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) return response.json();
+  const body = await response.text();
+  throw new Error(body.trim().startsWith("<")
+    ? `Server returned an unexpected response (${response.status}).`
+    : body || `Request failed (${response.status}).`);
 };
 const EMPTY_CERT_FORM = {
   skillCategory: "",
@@ -44,6 +52,10 @@ const EMPTY_SKILL_FORM = {
 };
 
 export default function SkillsCertifications({ currentUser, employeeProfile }) {
+  const employeeName = [employeeProfile?.first_name, employeeProfile?.last_name].filter(Boolean).join(" ")
+    || currentUser?.email
+    || "Employee";
+  const employeeInitials = employeeName.split(/\s+/).map((name) => name[0]).slice(0, 2).join("").toUpperCase();
   const [isCertOpen, setIsCertOpen] = useState(false);
   const [certForm, setCertForm] = useState(EMPTY_CERT_FORM);
   const [certFile, setCertFile] = useState(null);
@@ -61,7 +73,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
     try {
       setCertsError("");
       const response = await fetch(`${API_BASE}/api/employee/certifications/${currentUser.id}`);
-      const data = await response.json();
+      const data = await readApiResponse(response);
       if (!response.ok) throw new Error(data.message || "Failed to load certifications");
       setCerts(data);
     } catch (err) {
@@ -90,12 +102,12 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
           <div className="esc-cert-content">
             <span className="esc-cert-category">{cert.skill_category}</span>
             <h4>{cert.certification_name}</h4>
-            <p className="esc-cert-org">{cert.issuing_organization || "ΓÇö"}</p>
+            <p className="esc-cert-org">{cert.issuing_organization || "—"}</p>
 
             <div className="esc-cert-info">
               <div>
                 <span>Certificate Number</span>
-                <strong>{cert.certificate_number || "ΓÇö"}</strong>
+                <strong>{cert.certificate_number || "—"}</strong>
               </div>
               <div>
                 <span>Issue Date</span>
@@ -172,7 +184,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
         method: "POST",
         body,
       });
-      const data = await response.json();
+      const data = await readApiResponse(response);
       if (!response.ok) throw new Error(data.message || "Failed to save certification");
       setCertForm(EMPTY_CERT_FORM);
       setCertFile(null);
@@ -185,6 +197,9 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
     }
   };
   const [isSkillOpen, setIsSkillOpen] = useState(false);
+  const [skillMode, setSkillMode] = useState("add");
+  const [selectedSkill, setSelectedSkill] = useState(null);
+  const [isSkillDetailsOpen, setIsSkillDetailsOpen] = useState(false);
   const [skillForm, setSkillForm] = useState(EMPTY_SKILL_FORM);
   const [skillSubmitting, setSkillSubmitting] = useState(false);
   const [skillFeedback, setSkillFeedback] = useState({ type: "", text: "" });
@@ -194,6 +209,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
   const [skillsError, setSkillsError] = useState("");
   const [skillSearch, setSkillSearch] = useState("");
   const [skillCategoryFilter, setSkillCategoryFilter] = useState("");
+  const [openSkillActionsId, setOpenSkillActionsId] = useState(null);
 
   const loadSkills = useCallback(async () => {
     if (!currentUser?.id) {
@@ -203,7 +219,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
     try {
       setSkillsError("");
       const response = await fetch(`${API_BASE}/api/employee/skills/${currentUser.id}`);
-      const data = await response.json();
+      const data = await readApiResponse(response);
       if (!response.ok) throw new Error(data.message || "Failed to load skills");
       setSkills(data);
     } catch (err) {
@@ -229,6 +245,42 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
 
   const advancedCount = skills.filter((s) => s.proficiency === "Advanced").length;
   const expertCount = skills.filter((s) => s.proficiency === "Expert").length;
+
+  const openEditSkill = (skill) => {
+    setSkillMode("edit");
+    setSelectedSkill(skill);
+    setSkillForm({
+      skillName: skill.skill_name || "",
+      skillCategory: skill.skill_category || "",
+      otherSkill: skill.other_skill || "",
+      proficiency: skill.proficiency || "Beginner",
+      yearsOfExperience: skill.years_of_experience ?? "",
+      lastUsed: skill.last_used || "",
+    });
+    setSkillFeedback({ type: "", text: "" });
+    setIsSkillOpen(true);
+  };
+
+  const openAddSkill = () => {
+    setSkillMode("add");
+    setSelectedSkill(null);
+    setSkillForm(EMPTY_SKILL_FORM);
+    setSkillFeedback({ type: "", text: "" });
+    setIsSkillOpen(true);
+  };
+
+  const deleteSkill = async (skill) => {
+    setOpenSkillActionsId(null);
+    if (!window.confirm(`Delete ${skill.skill_name}?`)) return;
+    try {
+      const response = await fetch(`${API_BASE}/api/employee/skills/${currentUser.id}/${skill.id}`, { method: "DELETE" });
+      const data = await readApiResponse(response);
+      if (!response.ok) throw new Error(data.message || "Failed to delete skill");
+      await loadSkills();
+    } catch (err) {
+      setSkillsError(err.message || "Failed to delete skill");
+    }
+  };
 
   const skillRows = filteredSkills.map((skill) => {
     const style = CATEGORY_STYLE[skill.skill_category] || CATEGORY_STYLE.Others;
@@ -261,13 +313,43 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
         </div>
 
         <div className="esc-skill-experience">
-          <strong>{years === null ? "ΓÇö" : `${years} ${years === 1 ? "year" : "years"}`}</strong>
+          <strong>{years === null ? "—" : `${years} ${years === 1 ? "year" : "years"}`}</strong>
           <span>Experience</span>
         </div>
 
         <div className="esc-skill-verified" style={verified ? undefined : { color: "#f59a42" }}>
           <i className={`bi ${verified ? "bi-patch-check-fill" : "bi-clock-fill"}`}></i>
           {verified ? "Verified" : "Pending"}
+        </div>
+
+        <div className="dropdown esc-skill-actions">
+          <button
+            type="button"
+            className="btn esc-more-btn"
+            aria-label={`Actions for ${skill.skill_name}`}
+            aria-expanded={openSkillActionsId === skill.id}
+            onClick={() => setOpenSkillActionsId((currentId) => currentId === skill.id ? null : skill.id)}
+          >
+            <i className="bi bi-three-dots-vertical"></i>
+          </button>
+          <ul className={`dropdown-menu dropdown-menu-end esc-skill-dropdown${openSkillActionsId === skill.id ? " show" : ""}`}>
+            <li>
+              <button type="button" className="dropdown-item" onClick={() => { setOpenSkillActionsId(null); setSelectedSkill(skill); setIsSkillDetailsOpen(true); }}>
+                <i className="bi bi-eye"></i> View Details
+              </button>
+            </li>
+            <li>
+              <button type="button" className="dropdown-item" onClick={() => { setOpenSkillActionsId(null); openEditSkill(skill); }}>
+                <i className="bi bi-pencil"></i> Edit Skill
+              </button>
+            </li>
+            <li><hr className="dropdown-divider" /></li>
+            <li>
+              <button type="button" className="dropdown-item text-danger" onClick={() => deleteSkill(skill)}>
+                <i className="bi bi-trash"></i> Delete Skill
+              </button>
+            </li>
+          </ul>
         </div>
       </div>
     );
@@ -282,6 +364,8 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
     setIsSkillOpen(false);
     setSkillForm(EMPTY_SKILL_FORM);
     setSkillFeedback({ type: "", text: "" });
+    setSkillMode("add");
+    setSelectedSkill(null);
   };
 
   const saveSkill = async () => {
@@ -297,16 +381,17 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
     try {
       setSkillSubmitting(true);
       setSkillFeedback({ type: "", text: "" });
-      const response = await fetch(`${API_BASE}/api/employee/skills/${currentUser.id}`, {
-        method: "POST",
+      const response = await fetch(`${API_BASE}/api/employee/skills/${currentUser.id}${skillMode === "edit" ? `/${selectedSkill.id}` : ""}`, {
+        method: skillMode === "edit" ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(skillForm),
       });
-      const data = await response.json();
+      const data = await readApiResponse(response);
       if (!response.ok) throw new Error(data.message || "Failed to save skill");
       setSkillForm(EMPTY_SKILL_FORM);
       setSkillFeedback({ type: "success", text: data.message });
-      loadSkills();
+      await loadSkills();
+      closeSkill();
     } catch (err) {
       setSkillFeedback({ type: "danger", text: err.message || "Failed to save skill" });
     } finally {
@@ -350,40 +435,33 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
 
                             <div className="esc-employee-main">
 
-                                <div className="esc-avatar">
-                                    {(employeeProfile?.preferred_name
-                                        ? employeeProfile.preferred_name.slice(0, 2)
-                                        : employeeProfile?.first_name
-                                            ? `${employeeProfile.first_name[0]}${employeeProfile.last_name ? employeeProfile.last_name[0] : (employeeProfile.first_name[1] || "")}`
-                                            : currentUser?.email ? currentUser.email.slice(0, 2) : "EM"
-                                    ).toUpperCase()}
-                                </div>
+                                <div className="esc-avatar">{employeeInitials}</div>
 
                                 <div className="esc-employee-info">
                                     <div className="esc-name-row">
-                                        <h3>{employeeProfile?.preferred_name || [employeeProfile?.first_name, employeeProfile?.last_name].filter(Boolean).join(" ") || currentUser?.email?.split("@")[0] || "Employee"}</h3>
+                                            <h3>{employeeName}</h3>
                                         <span className="esc-status-badge">
                                             <span></span>
-                                            Active
+                                                {employeeProfile?.status || "—"}
                                         </span>
                                     </div>
 
-                                    <p>{employeeProfile?.designation || "Senior Software Engineer"}</p>
+                                    <p>{employeeProfile?.designation || employeeProfile?.role_name || "—"}</p>
 
                                     <div className="esc-employee-meta">
                                         <span>
                                             <i className="bi bi-diagram-3"></i>
-                                            {employeeProfile?.department || "Engineering"}
+                                            {employeeProfile?.department || "—"}
                                         </span>
 
                                         <span>
                                             <i className="bi bi-code-slash"></i>
-                                            {employeeProfile?.team || "Backend"}
+                                            {employeeProfile?.location || employeeProfile?.city || "—"}
                                         </span>
 
                                         <span>
                                             <i className="bi bi-person-badge"></i>
-                                            {employeeProfile?.employee_code || "EMP-1360"}
+                                            {employeeProfile?.employee_code || "—"}
                                         </span>
                                     </div>
                                 </div>
@@ -463,7 +541,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
 
                         
 
-                        <div className="esc-section-card">
+                        <div className="esc-section-card esc-skills-section">
 
                             <div className="esc-section-header">
 
@@ -507,7 +585,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
                                         <option value="Domain Knowledge">Domain Knowledge</option>
                                     </select>
 
-                                    <button type="button" className="btn esc-btn-primary" id="escAddSkillBtn" onClick={() => setIsSkillOpen(true)}>
+                                    <button type="button" className="btn esc-btn-primary esc-add-skill-btn" id="escAddSkillBtn" onClick={openAddSkill}>
                                         <i className="bi bi-plus-lg"></i>
                                         Add Skill
                                     </button>
@@ -521,6 +599,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
                             <div className="esc-skills-list" id="escSkillsList">
                                 {skillRows}
 
+                                {skillsLoading && <p className="text-center text-muted py-4 mb-0">Loading skills...</p>}
                                 {!skillsLoading && filteredSkills.length === 0 && (
                                     <p className="text-center text-muted py-4 mb-0">
                                         {skillsError || "No skills found."}
@@ -560,6 +639,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
 
                                 {certCards}
 
+                                {certsLoading && <p className="text-center text-muted py-4 mb-0">Loading certifications...</p>}
                                 {!certsLoading && certs.length === 0 && (
                                     <p className="text-center text-muted py-4 mb-0">
                                         {certsError || "No certifications found."}
@@ -596,7 +676,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
                                     <div>
                                         <span className="esc-modal-label">Skills Management</span>
                                         <h5 className="modal-title" id="escSkillModalTitle">
-                                            Add Skill
+                                            {skillMode === "edit" ? "Edit Skill" : "Add Skill"}
                                         </h5>
                                     </div>
 
@@ -716,7 +796,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
                                         disabled={skillSubmitting}
                                     >
                                         <i className="bi bi-check-lg"></i>
-                                        {skillSubmitting ? "Saving..." : "Save Skill"}
+                                        {skillSubmitting ? "Saving..." : skillMode === "edit" ? "Save Changes" : "Save Skill"}
                                     </button>
 
                                 </div>
@@ -729,6 +809,53 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
 
 
                     
+
+                    {isSkillDetailsOpen && selectedSkill && (
+                      <>
+                        <div className="modal-backdrop fade show" onClick={() => setIsSkillDetailsOpen(false)}></div>
+                        <div
+                          className="modal fade show d-block"
+                          role="dialog"
+                          aria-modal="true"
+                          aria-labelledby="escSkillDetailsTitle"
+                          onClick={(event) => {
+                            if (event.target === event.currentTarget) setIsSkillDetailsOpen(false);
+                          }}
+                        >
+                          <div className="modal-dialog modal-dialog-centered">
+                            <div className="modal-content esc-modal esc-skill-details-modal">
+                              <div className="modal-header esc-modal-header">
+                                <div>
+                                  <span className="esc-modal-label">Skill Details</span>
+                                  <h5 className="modal-title" id="escSkillDetailsTitle">
+                                    {selectedSkill.skill_category === "Others" && selectedSkill.other_skill ? selectedSkill.other_skill : selectedSkill.skill_name}
+                                  </h5>
+                                </div>
+                                <button type="button" className="btn-close" aria-label="Close" onClick={() => setIsSkillDetailsOpen(false)}></button>
+                              </div>
+                              <div className="modal-body">
+                                <div className="esc-skill-detail-grid">
+                                  <div><span>Category</span><strong>{selectedSkill.skill_category || "—"}</strong></div>
+                                  <div><span>Proficiency</span><strong>{selectedSkill.proficiency || "—"}</strong></div>
+                                  <div>
+                                    <span>Experience</span>
+                                    <strong>{selectedSkill.years_of_experience == null ? "—" : `${selectedSkill.years_of_experience} ${Number(selectedSkill.years_of_experience) === 1 ? "year" : "years"}`}</strong>
+                                  </div>
+                                  <div><span>Last Used</span><strong>{selectedSkill.last_used || "—"}</strong></div>
+                                  <div><span>Verification</span><strong>{selectedSkill.verification_status || "Pending"}</strong></div>
+                                </div>
+                              </div>
+                              <div className="modal-footer esc-modal-footer">
+                                <button type="button" className="btn esc-cancel-btn" onClick={() => setIsSkillDetailsOpen(false)}>Close</button>
+                                {/* <button type="button" className="btn esc-btn-primary" onClick={() => { setIsSkillDetailsOpen(false); openEditSkill(selectedSkill); }}>
+                                  <i className="bi bi-pencil"></i> Edit Skill
+                                </button> */}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     {isCertOpen && <div className="modal-backdrop fade show" onClick={closeCert}></div>}
 

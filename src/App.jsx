@@ -4,7 +4,7 @@ import './ems-styles.css';
 import EmployeeTemplate from './EmployeeTemplate';
 
 // const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost';
-const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+const API_BASE = 'http://localhost:5002';
 
 const DEFAULT_EMPLOYEE = {
   firstName: '',
@@ -327,27 +327,28 @@ export default function App() {
           if (Array.isArray(empList)) {
             const matched = empList.find(
               (e) =>
+                (e.email && currentUser.email && e.email.toLowerCase() === currentUser.email.toLowerCase()) ||
                 Number(e.id) === Number(currentUser.id) ||
-                (e.email && currentUser.email && e.email.toLowerCase() === currentUser.email.toLowerCase())
+                Number(e.user_id) === Number(currentUser.id)
             );
             if (matched) {
               const nameParts = (matched.full_name || '').trim().split(' ');
               profileData = {
-                employee_id: matched.id,
-                employee_code: matched.employee_code || profileData.employee_code || 'EMP-1360',
-                first_name: matched.first_name || nameParts[0] || profileData.first_name || 'Devashish',
-                last_name: matched.last_name || nameParts.slice(1).join(' ') || profileData.last_name || 'Ahire',
-                designation: matched.designation || profileData.designation || 'Senior Software Engineer',
-                department: matched.department || profileData.department || 'Engineering',
-                team: matched.team || profileData.team || 'Backend',
-                location: matched.location || matched.city || profileData.location || profileData.city || 'Nagpur',
-                city: matched.city || matched.location || profileData.city || profileData.location || 'Nagpur',
-                email: matched.email || currentUser.email,
-                role_name: matched.role_name || profileData.role_name || 'team_lead',
-                status: matched.status || 'Active',
-                joining_date: matched.joining_date || profileData.joining_date || '2025-08-05',
-                profile_completion_percentage: matched.profile_completion_percentage || profileData.profile_completion_percentage || 85,
                 ...profileData,
+                employee_id: matched.id || profileData.employee_id,
+                employee_code: matched.employee_code || profileData.employee_code,
+                first_name: matched.first_name || nameParts[0] || profileData.first_name,
+                last_name: matched.last_name || nameParts.slice(1).join(' ') || profileData.last_name,
+                designation: matched.designation || profileData.designation,
+                department: matched.department || profileData.department,
+                team: matched.team || profileData.team,
+                location: matched.location || matched.city || profileData.location || profileData.city,
+                city: matched.city || matched.location || profileData.city || profileData.location,
+                email: matched.email || currentUser.email,
+                role_name: matched.role_name || profileData.role_name,
+                status: matched.status || profileData.status || 'Active',
+                joining_date: matched.joining_date || profileData.joining_date,
+                profile_completion_percentage: matched.profile_completion_percentage || profileData.profile_completion_percentage,
               };
             }
           }
@@ -373,17 +374,19 @@ export default function App() {
 
       const savedPreferred = localStorage.getItem(`hrms_preferred_name_${currentUser.id}`);
       if (!profileData.preferred_name) {
-        profileData.preferred_name = savedPreferred || profileData.first_name || (currentUser.email ? currentUser.email.split('@')[0] : 'Devashish');
+        profileData.preferred_name = savedPreferred || profileData.first_name || (currentUser.email ? currentUser.email.split('@')[0] : 'Employee');
       }
 
-      // Set guaranteed fallbacks if empty
-      profileData.employee_code = profileData.employee_code || 'EMP-1360';
-      profileData.designation = profileData.designation || 'Senior Software Engineer';
-      profileData.department = profileData.department || 'Engineering';
-      profileData.team = profileData.team || 'Backend';
+      // Dynamic fallbacks derived from currentUser instead of hardcoded strings
+      profileData.first_name = profileData.first_name || (currentUser.email ? currentUser.email.split('@')[0] : 'Employee');
+      profileData.last_name = profileData.last_name || '';
+      profileData.employee_code = profileData.employee_code || `EMP-${String(currentUser.id || '0000').padStart(4, '0')}`;
+      profileData.designation = profileData.designation || currentUser.role || 'Employee';
+      profileData.department = profileData.department || 'General';
+      profileData.team = profileData.team || 'General';
       profileData.city = profileData.city || profileData.location || 'Nagpur';
       profileData.location = profileData.location || profileData.city || 'Nagpur';
-      profileData.profile_completion_percentage = profileData.profile_completion_percentage || 85;
+      profileData.profile_completion_percentage = Number(profileData.profile_completion_percentage) || 80;
 
       setEmployeeProfile(profileData);
     } catch (error) {

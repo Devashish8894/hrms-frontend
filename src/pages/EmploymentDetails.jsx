@@ -5,6 +5,15 @@ export default function EmploymentDetails({ employeeProfile, currentUser }) {
   const [workMode, setWorkMode] = useState(employeeProfile?.work_mode || 'Hybrid');
   const [updating, setUpdating] = useState(false);
 
+  useEffect(() => {
+    if (employeeProfile && Object.keys(employeeProfile).length > 0) {
+      setProfile(employeeProfile);
+      if (employeeProfile.work_mode) {
+        setWorkMode(employeeProfile.work_mode);
+      }
+    }
+  }, [employeeProfile]);
+
   // Payslips Dynamic State
   const currentDate = new Date();
   const currentCalYear = currentDate.getFullYear();
@@ -117,42 +126,12 @@ export default function EmploymentDetails({ employeeProfile, currentUser }) {
   const isUpcoming = (effectiveCalYear > currentCalYear) || 
     (effectiveCalYear === currentCalYear && Number(selectedMonth) > currentCalMonth);
 
-  // Find payslip for selected month and year
+  // Find payslip for selected month and year from DB
   const foundPayslip = payslipsData.find(
     p => Number(p.month) === Number(selectedMonth) && Number(p.year) === effectiveCalYear
   );
 
-  // Fallback demo payslip if DB returned none for past months
-  const activePayslip = foundPayslip || (!isUpcoming ? {
-    id: `generated-${effectiveCalYear}-${selectedMonth}`,
-    financial_year: selectedFY,
-    year: effectiveCalYear,
-    month: Number(selectedMonth),
-    month_name: selectedMonthObj.name,
-    payment_date: `${effectiveCalYear}-${String(selectedMonth).padStart(2, '0')}-28`,
-    // Earnings
-    basic_salary: 40000,
-    hra: 20000,
-    travel_allowance: 14000,
-    conveyance_allowance: 12000,
-    other_allowance: 14000,
-    gross_earnings: 100000,
-    // Deductions
-    loss_of_pay: 0,
-    professional_tax: 250,
-    epf_deductions: 0,
-    tds_deductions: 0,
-    total_deductions: 250,
-    // Net
-    net_pay: 99750,
-    // Info
-    paid_days: 31,
-    lop_days: 0,
-    bank_name: 'KOTAK MAHINDRA BANK',
-    bank_account: '5212500492',
-    pan_number: 'BIVPA5135J',
-    status: 'Paid'
-  } : null);
+  const activePayslip = foundPayslip || null;
 
   const handleUpdateWorkMode = async (mode) => {
     if (!profile.employee_id) return;
@@ -575,8 +554,8 @@ export default function EmploymentDetails({ employeeProfile, currentUser }) {
                       {/* Payslip Result Box */}
                       <div className="payslip-result-card">
                         <div className="payslip-result-left">
-                          <div className={`payslip-result-icon ${isUpcoming ? 'disabled' : ''}`}>
-                            <i className={isUpcoming ? "bi bi-calendar-x" : "bi bi-file-earmark-pdf"}></i>
+                          <div className={`payslip-result-icon ${isUpcoming || !activePayslip ? 'disabled' : ''}`}>
+                            <i className={isUpcoming ? "bi bi-calendar-x" : (!activePayslip ? "bi bi-file-earmark-x" : "bi bi-file-earmark-pdf")}></i>
                           </div>
                           <div className="payslip-result-info">
                             <h4>{selectedMonthObj.name} {effectiveCalYear}</h4>
@@ -584,8 +563,10 @@ export default function EmploymentDetails({ employeeProfile, currentUser }) {
                               {isUpcoming 
                                 ? "Upcoming month · Payslip not generated yet" 
                                 : loadingPayslips 
-                                  ? "Loading payslip details..."
-                                  : "Payslip ready to view and download"}
+                                  ? "Checking records..."
+                                  : activePayslip 
+                                    ? "Payslip ready to view and download"
+                                    : "No payslip record found for this month"}
                             </p>
                           </div>
                         </div>
@@ -594,8 +575,8 @@ export default function EmploymentDetails({ employeeProfile, currentUser }) {
                           <button
                             type="button"
                             className="payslip-btn-view"
-                            disabled={isUpcoming || loadingPayslips}
-                            onClick={() => setActivePayslipModal(activePayslip)}
+                            disabled={isUpcoming || loadingPayslips || !activePayslip}
+                            onClick={() => activePayslip && setActivePayslipModal(activePayslip)}
                           >
                             <i className="bi bi-eye"></i> View payslip
                           </button>
@@ -757,25 +738,25 @@ export default function EmploymentDetails({ employeeProfile, currentUser }) {
                     <tbody>
                       <tr>
                         <td className="meta-label">EMP CODE</td>
-                        <td className="meta-value">: {profile.employee_code || 'EMP-1360'}</td>
+                        <td className="meta-value">: {profile.employee_code || '—'}</td>
                         <td className="meta-label">BANK NAME</td>
                         <td className="meta-value">: {activePayslipModal.bank_name || 'KOTAK MAHINDRA BANK'}</td>
                       </tr>
                       <tr>
                         <td className="meta-label">EMP NAME</td>
-                        <td className="meta-value">: {(profile.first_name || 'DEVASHISH') + ' ' + (profile.last_name || 'AHIRE')}</td>
+                        <td className="meta-value">: {([profile.first_name, profile.last_name].filter(Boolean).join(' ') || currentUser?.email || 'EMPLOYEE').toUpperCase()}</td>
                         <td className="meta-label">BANK A/C NO.</td>
                         <td className="meta-value">: {activePayslipModal.bank_account || '5212500492'}</td>
                       </tr>
                       <tr>
                         <td className="meta-label">DESIGNATION</td>
-                        <td className="meta-value">: {profile.designation || 'SENIOR SOFTWARE ENGINEER'}</td>
+                        <td className="meta-value">: {(profile.designation || 'EMPLOYEE').toUpperCase()}</td>
                         <td className="meta-label">PAN NUMBER</td>
                         <td className="meta-value">: {activePayslipModal.pan_number || 'BIVPA5135J'}</td>
                       </tr>
                       <tr>
                         <td className="meta-label">DOJ</td>
-                        <td className="meta-value">: {formatDate(profile.joining_date) || 'August 5, 2025'}</td>
+                        <td className="meta-value">: {formatDate(profile.joining_date)}</td>
                         <td className="meta-label">PAID DAYS</td>
                         <td className="meta-value">: {activePayslipModal.paid_days || 31}</td>
                       </tr>

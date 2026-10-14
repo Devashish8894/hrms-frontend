@@ -7,7 +7,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 const formatDate = (value) => {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "ΓÇö";
+  if (Number.isNaN(date.getTime())) return "—";
   return `${String(date.getDate()).padStart(2, "0")}-${MONTHS[date.getMonth()]}-${date.getFullYear()}`;
 };
 
@@ -26,7 +26,15 @@ const statusKind = (status) => {
   if (status === "Re-upload") return { cls: "rejected", icon: "bi-arrow-repeat", label: "Re-upload Required" };
   return { cls: "pending", icon: "bi-clock-fill", label: "Pending" };
 };
-const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5002";
+const readApiResponse = async (response) => {
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) return response.json();
+    const body = await response.text();
+    throw new Error(body.trim().startsWith("<")
+        ? `Server returned an unexpected response (${response.status}).`
+        : body || `Request failed (${response.status}).`);
+};
 const EMPTY_FORM = {
   documentCategory: "",
   documentType: "",
@@ -38,6 +46,12 @@ const EMPTY_FORM = {
 };
 
 export default function Documents({ currentUser, employeeProfile }) {
+    const firstName = employeeProfile?.first_name || "";
+    const lastName = employeeProfile?.last_name || "";
+    const employeeName = `${firstName} ${lastName}`.trim() || currentUser?.email || "Employee";
+    const employeeInitials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+        || currentUser?.email?.slice(0, 2).toUpperCase()
+        || "EM";
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileError, setFileError] = useState("");
@@ -165,7 +179,7 @@ export default function Documents({ currentUser, employeeProfile }) {
         </td>
         <td>
           <span className={expiring ? "epd-expiry epd-expiry-warning" : "epd-expiry"}>
-            {doc.expiry_date ? formatDate(`${doc.expiry_date}T00:00:00`) : "ΓÇö"}
+            {doc.expiry_date ? formatDate(`${doc.expiry_date}T00:00:00`) : "—"}
           </span>
         </td>
         <td>
@@ -219,7 +233,7 @@ export default function Documents({ currentUser, employeeProfile }) {
           method: "PATCH",
           body: editBody,
         });
-        const data = await response.json();
+        const data = await readApiResponse(response);
         if (!response.ok) throw new Error(data.message || "Update failed");
         loadDocuments();
         closeUpload();
@@ -247,7 +261,7 @@ export default function Documents({ currentUser, employeeProfile }) {
         method: "POST",
         body,
       });
-      const data = await response.json();
+    const data = await readApiResponse(response);
       if (!response.ok) throw new Error(data.message || "Upload failed");
       setFeedback({ type: "success", text: data.message });
       setSelectedFile(null);
@@ -305,39 +319,34 @@ export default function Documents({ currentUser, employeeProfile }) {
                             <div className="esc-employee-main">
 
                                 <div className="esc-avatar">
-                                    {(employeeProfile?.preferred_name
-                                        ? employeeProfile.preferred_name.slice(0, 2)
-                                        : employeeProfile?.first_name
-                                            ? `${employeeProfile.first_name[0]}${employeeProfile.last_name ? employeeProfile.last_name[0] : (employeeProfile.first_name[1] || "")}`
-                                            : currentUser?.email ? currentUser.email.slice(0, 2) : "EM"
-                                    ).toUpperCase()}
+                                    {employeeInitials}
                                 </div>
 
                                 <div className="esc-employee-info">
                                     <div className="esc-name-row">
-                                        <h3>{employeeProfile?.preferred_name || [employeeProfile?.first_name, employeeProfile?.last_name].filter(Boolean).join(" ") || currentUser?.email?.split("@")[0] || "Employee"}</h3>
+                                            <h3>{employeeName}</h3>
                                         <span className="esc-status-badge">
                                             <span></span>
                                             Active
                                         </span>
                                     </div>
 
-                                    <p>{employeeProfile?.designation || "Senior Software Engineer"}</p>
+                                    <p>{employeeProfile?.designation || "Employee"}</p>
 
                                     <div className="esc-employee-meta">
                                         <span>
                                             <i className="bi bi-diagram-3"></i>
-                                            {employeeProfile?.department || "Engineering"}
+                                            {employeeProfile?.department || "Department"}
                                         </span>
 
                                         <span>
                                             <i className="bi bi-code-slash"></i>
-                                            {employeeProfile?.team || "Backend"}
+                                            {employeeProfile?.team || "Team"}
                                         </span>
 
                                         <span>
                                             <i className="bi bi-person-badge"></i>
-                                            {employeeProfile?.employee_code || "EMP-1360"}
+                                            {employeeProfile?.employee_code || "EMP-0000"}
                                         </span>
                                     </div>
                                 </div>
@@ -526,7 +535,7 @@ export default function Documents({ currentUser, employeeProfile }) {
                             <div className="epd-table-footer">
 
                                 <span>
-                                    Showing <strong>{filteredDocuments.length ? `${pageStart + 1}ΓÇô${pageStart + pagedDocuments.length}` : 0}</strong> of{" "}
+                                    Showing <strong>{filteredDocuments.length ? `${pageStart + 1}–${pageStart + pagedDocuments.length}` : 0}</strong> of{" "}
                                     <strong>{filteredDocuments.length}</strong> documents
                                 </span>
 
@@ -615,7 +624,7 @@ export default function Documents({ currentUser, employeeProfile }) {
                                             </div>
                                             <div>
                                                 <strong>{viewDoc.document_name || viewDoc.document_type}</strong>
-                                                <span>{viewDoc.file_name} ┬╖ {fileKind(viewDoc).label}</span>
+                                                <span>{viewDoc.file_name} · {fileKind(viewDoc).label}</span>
                                             </div>
                                         </div>
 
@@ -630,7 +639,7 @@ export default function Documents({ currentUser, employeeProfile }) {
                                             ].map(([label, value]) => (
                                                 <div className="col-6" key={label}>
                                                     <span>{label}</span>
-                                                    <strong>{value || "ΓÇö"}</strong>
+                                                    <strong>{value || "—"}</strong>
                                                 </div>
                                             ))}
                                         </div>
@@ -731,7 +740,7 @@ export default function Documents({ currentUser, employeeProfile }) {
                                         </span>
 
                                         <small>
-                                            PDF, JPG, PNG, DOC, DOCX ┬╖ Maximum 10 MB
+                                            PDF, JPG, PNG, DOC, DOCX · Maximum 10 MB
                                         </small>
 
                                     </div>

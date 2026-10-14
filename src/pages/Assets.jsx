@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+const API_BASE = "http://localhost:5002";
 
 const TYPE_META = {
   laptop: { icon: "bi-laptop", cls: "laptop", label: "Laptop" },
@@ -24,6 +24,13 @@ const fmtTimeline = (d) => (d ? fmtDate(d).replace(/-/g, " ") : "—");
 const statusClass = (s) => (s === "Returned" ? "returned" : s === "Under Maintenance" || s === "Return Requested" ? "maintenance" : "assigned");
 const typeLine = (a) => [metaFor(a.asset_type).label, a.manufacturer, a.model].filter(Boolean).join(" · ");
 const dayMs = 24 * 60 * 60 * 1000;
+const STATUS_FILTER_LABELS = {
+  assets: "Assigned Assets",
+  total: "Total Assets",
+  active: "Active Assets",
+  returned: "Returned Assets",
+  maintenance: "Under Maintenance",
+};
 
 export default function Assets({ currentUser, employeeProfile }) {
   const user = currentUser || (employeeProfile?.user_id ? { id: employeeProfile.user_id, email: employeeProfile.email } : null);
@@ -31,7 +38,7 @@ export default function Assets({ currentUser, employeeProfile }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("assets");
   const [selectedId, setSelectedId] = useState(null);
   const [returnAsset, setReturnAsset] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -151,13 +158,18 @@ export default function Assets({ currentUser, employeeProfile }) {
   const maintenanceCount = assets.filter((a) => a.status === "Under Maintenance").length;
 
   const q = search.toLowerCase().trim();
-  const current = assets.filter((a) => a.status !== "Returned");
-  const filtered = current.filter((a) => {
+  const filtered = assets.filter((a) => {
+    const matchesStatus =
+      statusFilter === "total" ||
+      (statusFilter === "assets" && a.status !== "Returned") ||
+      (statusFilter === "active" && a.status === "Assigned") ||
+      (statusFilter === "returned" && a.status === "Returned") ||
+      (statusFilter === "maintenance" && a.status === "Under Maintenance");
     const text = `${a.asset_tag} ${a.asset_name} ${a.serial_number || ""} ${a.asset_type}`.toLowerCase();
-    return text.includes(q) && (typeFilter === "all" || a.asset_type === typeFilter);
+    return matchesStatus && text.includes(q);
   });
 
-  const selected = current.find((a) => a.id === selectedId) || null;
+  const selected = filtered.find((a) => a.id === selectedId) || filtered[0] || null;
   const sMeta = selected ? metaFor(selected.asset_type) : null;
 
   let warrantyTitle = "No warranty information";
@@ -238,17 +250,17 @@ export default function Assets({ currentUser, employeeProfile }) {
                                     </span>
                                 </div>
 
-                                <p>{employee?.designation || employee?.role_name || employeeProfile?.designation || "Senior Software Engineer"}</p>
+                                <p>{employee?.designation || employee?.role_name || ""}</p>
 
                                 <div className="esc-employee-meta">
                                     <span>
                                         <i className="bi bi-diagram-3"></i>
-                                        {employee?.department || employeeProfile?.department || "Engineering"}
+                                        {employee?.department || "—"}
                                     </span>
 
                                     <span>
                                         <i className="bi bi-person-badge"></i>
-                                        {employee?.employee_code || employeeProfile?.employee_code || "EMP-1360"}
+                                        {employee?.employee_code || "—"}
                                     </span>
                                 </div>
                             </div>
@@ -283,8 +295,8 @@ export default function Assets({ currentUser, employeeProfile }) {
                                 <div className="ea-card-header common-card-heading">
                                     <div>
                                         <span className="ea-section-label">ASSET INVENTORY</span>
-                                        <h4>Assigned Assets</h4>
-                                        <p>Equipment issued to {fullName}.</p>
+                                        <h4>{STATUS_FILTER_LABELS[statusFilter]}</h4>
+                                        <p>Search and filter {fullName}&apos;s assets by status.</p>
                                     </div>
 
                                     <div className="ea-header-tools">
@@ -294,19 +306,16 @@ export default function Assets({ currentUser, employeeProfile }) {
                                                 value={search} onChange={(e) => setSearch(e.target.value)} />
                                         </div>
 
-                                        <select className="form-select ea-filter" id="eaAssetTypeFilter"
-                                            value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-                                            <option value="all">All Types</option>
-                                            <option value="laptop">Laptop</option>
-                                            <option value="monitor">Monitor</option>
-                                            <option value="mobile">Mobile</option>
-                                            <option value="keyboard">Keyboard</option>
-                                            <option value="mouse">Mouse</option>
-                                            <option value="headset">Headset</option>
-                                            <option value="access-card">Access Card</option>
-                                            <option value="security-token">Security Token</option>
-                                            <option value="other">Other Equipment</option>
+                                        <select className="form-select ea-filter" id="eaAssetStatusFilter"
+                                            aria-label="Filter assets by status"
+                                            value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                                            <option value="assets">Assets</option>
+                                            <option value="total">Total Assets</option>
+                                            <option value="active">Active Assets</option>
+                                            <option value="returned">Returned Assets</option>
+                                            <option value="maintenance">Under Maintenance</option>
                                         </select>
+
                                     </div>
                                 </div>
 
@@ -315,7 +324,7 @@ export default function Assets({ currentUser, employeeProfile }) {
                                         const m = metaFor(a.asset_type);
                                         return (
                                             <div className="ea-asset-row" key={a.id} onClick={() => setSelectedId(a.id)}
-                                                style={{ cursor: "pointer", background: a.id === selectedId ? "#f6f5ff" : undefined, boxShadow: a.id === selectedId ? "inset 3px 0 0 #4b3fd1" : undefined }}>
+                                                style={{ cursor: "pointer", background: a.id === selected?.id ? "#f6f5ff" : undefined, boxShadow: a.id === selected?.id ? "inset 3px 0 0 #4b3fd1" : undefined }}>
                                                 <div className="ea-asset-main">
                                                     <div className={`ea-asset-icon ${m.cls}`}>
                                                         <i className={`bi ${m.icon}`}></i>
@@ -372,7 +381,7 @@ export default function Assets({ currentUser, employeeProfile }) {
                                     <div className="ea-empty-state" id="eaEmptyState">
                                         <div><i className="bi bi-box-seam"></i></div>
                                         <h4>No assets found</h4>
-                                        <p>{current.length === 0 ? "No assets are currently assigned." : "Try changing your search or asset type filter."}</p>
+                                        <p>{assets.length === 0 ? "No assets are currently assigned." : "Try changing your search or asset filters."}</p>
                                     </div>
                                 )}
                             </div>
@@ -554,54 +563,6 @@ export default function Assets({ currentUser, employeeProfile }) {
                                     </div>
                                 </>
                             )}
-                            <div className="ea-card">
-
-                                <div className="ea-card-header common-card-heading">
-                                    <div>
-                                        <span className="ea-section-label">QUICK ACTIONS</span>
-                                        <h4>Asset Requests</h4>
-                                    </div>
-                                </div>
-
-                                <div className="ea-quick-actions">
-
-                                    <button type="button" data-bs-toggle="modal" data-bs-target="#eaAssignAssetModal">
-                                        <span className="purple">
-                                            <i className="bi bi-plus-circle"></i>
-                                        </span>
-                                        <div>
-                                            <strong>Request a New Asset</strong>
-                                            <small>Submit a request for equipment you need</small>
-                                        </div>
-                                        <i className="bi bi-chevron-right"></i>
-                                    </button>
-
-                                    <button type="button" id="eaTransferBtn">
-                                        <span className="blue">
-                                            <i className="bi bi-arrow-left-right"></i>
-                                        </span>
-                                        <div>
-                                            <strong>Transfer Asset</strong>
-                                            <small>Move asset to another employee</small>
-                                        </div>
-                                        <i className="bi bi-chevron-right"></i>
-                                    </button>
-
-                                    <button type="button" id="eaHistoryBtn">
-                                        <span className="green">
-                                            <i className="bi bi-clock-history"></i>
-                                        </span>
-                                        <div>
-                                            <strong>View Asset History</strong>
-                                            <small>Assignments and status changes</small>
-                                        </div>
-                                        <i className="bi bi-chevron-right"></i>
-                                    </button>
-
-                                </div>
-
-                            </div>
-
                         </div>
 
                     </div>
