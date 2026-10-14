@@ -14,6 +14,22 @@ export default function EmploymentDetails({ employeeProfile, currentUser, onProf
     }
   }, [employeeProfile]);
 
+  // Always load latest work_mode directly from employee_attendance in DB on mount/reload
+  useEffect(() => {
+    const targetId = currentUser?.id || profile?.employee_id;
+    if (!targetId) return;
+    const API_URL = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+    fetch(`${API_URL}/api/attendance/today/${targetId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.today && data.today.work_mode) {
+          setWorkMode(data.today.work_mode);
+          setProfile(prev => ({ ...prev, work_mode: data.today.work_mode }));
+        }
+      })
+      .catch(() => {});
+  }, [currentUser?.id, profile?.employee_id]);
+
   // Payslips Dynamic State
   const currentDate = new Date();
   const currentCalYear = currentDate.getFullYear();

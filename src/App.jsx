@@ -286,6 +286,9 @@ export default function App() {
       const data = await res.json();
       if (res.ok && data.today) {
         setAttendanceStatus(data.today.check_out_time ? 'Checked Out' : 'Checked In');
+        if (data.today.work_mode) {
+          setEmployeeProfile(prev => ({ ...(prev || {}), work_mode: data.today.work_mode }));
+        }
         if (data.today.check_in_time) {
           const d = new Date(data.today.check_in_time);
           setCheckInTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
