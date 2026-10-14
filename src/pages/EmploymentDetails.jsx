@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-export default function EmploymentDetails({ employeeProfile, currentUser }) {
+export default function EmploymentDetails({ employeeProfile, currentUser, onProfileUpdate }) {
   const [profile, setProfile] = useState(employeeProfile || {});
   const [workMode, setWorkMode] = useState(employeeProfile?.work_mode || 'Hybrid');
   const [updating, setUpdating] = useState(false);
@@ -134,19 +134,24 @@ export default function EmploymentDetails({ employeeProfile, currentUser }) {
   const activePayslip = foundPayslip || null;
 
   const handleUpdateWorkMode = async (mode) => {
-    if (!profile.employee_id) return;
+    const targetId = profile.employee_id || currentUser?.id;
+    if (!targetId) return;
+    setWorkMode(mode);
     setUpdating(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/employee/${profile.employee_id}/work-mode`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/employee/${targetId}/work-mode`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ work_mode: mode })
       });
       if (response.ok) {
-        setWorkMode(mode); window.location.reload();
-        // Optionally, if there's a global refresh function passed as prop, call it here
+        setWorkMode(mode);
+        setProfile(prev => ({ ...prev, work_mode: mode }));
+        if (typeof onProfileUpdate === 'function') {
+          onProfileUpdate();
+        }
       } else {
-        console.error("Failed to update work mode");
+        console.error("Failed to update work mode on server");
       }
     } catch (error) {
       console.error("Error updating work mode:", error);

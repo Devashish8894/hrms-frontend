@@ -1578,7 +1578,7 @@ export default function EmployeeTemplate({
   </>
 )}
 {activePage === "employee-profile" && <EmployeeProfile currentUser={currentUser} employeeProfile={employeeProfile} onProfileUpdate={fetchEmployeeProfile} />}
-{activePage === "employement-details" && <EmploymentDetails employeeProfile={employeeProfile} currentUser={currentUser} />}
+{activePage === "employement-details" && <EmploymentDetails employeeProfile={employeeProfile} currentUser={currentUser} onProfileUpdate={fetchEmployeeProfile} />}
 {activePage === "documents" && <Documents employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "skills-certifications" && <SkillsCertifications employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "attendance" && <Attendance currentUser={currentUser} employeeProfile={employeeProfile} />}
