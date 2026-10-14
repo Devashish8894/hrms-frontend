@@ -27,6 +27,22 @@ export default function EmployeeTemplate({
   const [assetRequests, setAssetRequests] = useState([]);
   const [attendanceCorrections, setAttendanceCorrections] = useState([]);
   const [widgetsData, setWidgetsData] = useState({ nextHoliday: null, upcomingBirthday: null, upcomingAnniversary: null });
+  const [todayWorkMode, setTodayWorkMode] = useState(employeeProfile?.work_mode || '');
+
+  // Fetch today's work mode directly from employee_attendance for this employee
+  useEffect(() => {
+    const targetId = currentUser?.id || employeeProfile?.employee_id;
+    if (!targetId) return;
+    const API_URL = import.meta.env.VITE_API_URL || 'https://hrms-backend-5xo8.onrender.com';
+    fetch(`${API_URL}/api/attendance/today/${targetId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data?.today?.work_mode) {
+          setTodayWorkMode(data.today.work_mode);
+        }
+      })
+      .catch(() => {});
+  }, [currentUser?.id, employeeProfile?.employee_id]);
 
   // Page key to URL path mapping
   const pageToPath = {
@@ -724,7 +740,7 @@ export default function EmployeeTemplate({
                                             data-work-location="office" aria-label="Office, WFO">
                                             <i className="bi bi-geo-alt-fill" aria-hidden="true"></i>
                                             <span id="edWorkLocationLabel">{employeeProfile?.city || "Office"}</span>
-                                            <strong id="edWorkMode">{employeeProfile?.work_mode || "Hybrid"}</strong>
+                                            <strong id="edWorkMode">{todayWorkMode || employeeProfile?.work_mode || "Hybrid"}</strong>
                                         </div>
                                     </div>
 
