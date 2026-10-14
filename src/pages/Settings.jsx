@@ -815,7 +815,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                             <p>Your basic identity and personal details</p>
                         </div>
                     </div>
-                    <button className="btn es-edit-btn" type="button" onClick={openPersonalEdit} disabled={!personalInfo}>
+                    <button className="btn es-edit-btn" type="button" onClick={openPersonalEdit}>
                         <i className="bi bi-pencil"></i> Edit
                     </button>
                 </div>
@@ -845,7 +845,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                             <p>Your personal contact details and addresses</p>
                         </div>
                     </div>
-                    <button className="btn es-edit-btn" type="button" onClick={openContactEdit} disabled={!contactInfo}>
+                    <button className="btn es-edit-btn" type="button" onClick={openContactEdit} >
                         <i className="bi bi-pencil"></i> Edit
                     </button>
                 </div>
@@ -912,7 +912,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                             <p>Your salary account and payment information</p>
                         </div>
                     </div>
-                    <button className="btn es-bank-edit-trigger" type="button" onClick={openBankEdit} disabled={!bankInfo}>
+                    <button className="btn es-bank-edit-trigger" type="button" onClick={openBankEdit}>
                         <i className="bi bi-pencil"></i> Request Update
                     </button>
                 </div>
@@ -1492,7 +1492,7 @@ export default function Settings({ currentUser, employeeProfile }) {
             </div>
             <div className="modal-footer">
                 <button type="button" className="btn es-btn-light" onClick={() => setIsPersonalEditOpen(false)}>Cancel</button>
-                <button type="submit" className="btn es-btn-primary" disabled={personalEditSubmitting}>
+                <button type="submit" className="btn es-btn-primary" >
                     <i className={`bi ${personalEditSubmitting ? "bi-arrow-repeat" : "bi-check-lg"}`}></i>
                     {personalEditSubmitting ? "Saving..." : "Save Changes"}
                 </button>
@@ -1539,7 +1539,7 @@ export default function Settings({ currentUser, employeeProfile }) {
             </div>
             <div className="modal-footer">
                 <button type="button" className="btn es-btn-light" onClick={closeAccountRevealModal}>Cancel</button>
-                <button type="submit" className="btn es-btn-primary" disabled={accountRevealLoading}>
+                <button type="submit" className="btn es-btn-primary" >
                     {accountRevealLoading ? "Verifying..." : "Reveal Account Number"}
                 </button>
             </div>
@@ -1613,7 +1613,7 @@ export default function Settings({ currentUser, employeeProfile }) {
             </div>
             <div className="modal-footer">
                 <button type="button" className="btn es-btn-light" onClick={closeBankEdit}>Cancel</button>
-                <button type="submit" className="btn es-btn-primary" disabled={bankEditSubmitting}>
+                <button type="submit" className="btn es-btn-primary" >
                     <i className={`bi ${bankEditSubmitting ? "bi-arrow-repeat" : "bi-send"}`}></i>
                     {bankEditSubmitting ? "Submitting..." : "Submit Update Request"}
                 </button>
