@@ -1,86 +1,29 @@
-import React, { useEffect, useState } from "react";
-
-const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
-
-const formatDate = (value) => {
-    if (!value) return "-";
-    const date = new Date(`${value}T00:00:00`);
-    return Number.isNaN(date.getTime())
-        ? value
-        : date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-};
+import React from "react";
 
 export default function EmployeeProfile({ currentUser, employeeProfile }) {
-    const [personalInfo, setPersonalInfo] = useState(null);
-    const [contactInfo, setContactInfo] = useState(null);
-    const [profile, setProfile] = useState(null);
-    const [employmentInfo, setEmploymentInfo] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
-
-    useEffect(() => {
-        if (!currentUser?.id) {
-            setLoading(false);
-            return;
-        }
-
-        const load = async (path) => {
-            const response = await fetch(`${API_BASE}/api/employee/${path}/${currentUser.id}`);
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || "Failed to load data");
-            return data;
-        };
-
-        (async () => {
-            try {
-                setLoading(true);
-                setError("");
-                const [personal, contact, prof, employment] = await Promise.all([
-                    load("personal-info"),
-                    load("contact-info"),
-                    load("profile"),
-                    load("employment-info"),
-                ]);
-                setPersonalInfo(personal);
-                setContactInfo(contact);
-                setProfile(prof);
-                setEmploymentInfo(employment);
-            } catch (err) {
-                setError(err.message || "Unable to load personal information");
-            } finally {
-                setLoading(false);
-            }
-        })();
-    }, [currentUser?.id]);
-
-    const fullName = personalInfo
-        ? [personalInfo.first_name, personalInfo.middle_name, personalInfo.last_name].filter(Boolean).join(" ")
-        : [employeeProfile?.first_name, employeeProfile?.middle_name, employeeProfile?.last_name].filter(Boolean).join(" ");
-    const displayName = personalInfo?.preferred_name || fullName || employeeProfile?.preferred_name || employeeProfile?.first_name || currentUser?.email?.split("@")[0] || "Employee";
-    const bannerInitials = (displayName.split(" ").map(w => w[0]).join("").slice(0, 2) || "EM").toUpperCase();
-    const location = (contactInfo
-        ? [contactInfo.current_city, contactInfo.current_state, contactInfo.current_country].filter(Boolean).join(", ")
-        : (employeeProfile?.city || employeeProfile?.location || "")) || "Nagpur";
+    const firstName = employeeProfile?.first_name || "";
+    const lastName = employeeProfile?.last_name || "";
+    const employeeName = `${firstName} ${lastName}`.trim() || currentUser?.email || "Employee";
+    const employeeInitials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+        || currentUser?.email?.slice(0, 2).toUpperCase()
+        || "EM";
     const personalItems = [
-        { label: "Full Name", value: fullName || "Devashish Ahire" },
-        { label: "Employee ID", value: profile?.employee_code || employeeProfile?.employee_code || "EMP-1360" },
-        { label: "Email", value: contactInfo?.work_email || profile?.email || currentUser?.email || "dev@ramel.co.in" },
-        { label: "Phone", value: contactInfo?.phone_number || "+91 98765 43210" },
-        { label: "Date of Birth", value: personalInfo?.date_of_birth ? formatDate(personalInfo.date_of_birth) : "15 August 1993" },
-        { label: "Location", value: location },
+        { label: "First Name", value: firstName },
+        { label: "Last Name", value: lastName },
+        { label: "Email", value: employeeProfile?.email || currentUser?.email },
+        { label: "City", value: employeeProfile?.city },
     ];
-
     const employmentItems = [
-        { label: "Department", value: employmentInfo?.department || employeeProfile?.department || "Engineering" },
-        { label: "Team", value: employmentInfo?.team || employeeProfile?.team || "Backend" },
-        { label: "Designation", value: employmentInfo?.designation || employeeProfile?.designation || "Senior Software Engineer" },
-        { label: "Manager", value: employmentInfo?.reporting_manager || "Maruthi Vara Prasad" },
-        { label: "Joining Date", value: (employmentInfo?.joining_date || employeeProfile?.joining_date) ? formatDate(employmentInfo?.joining_date || employeeProfile?.joining_date) : "5 August 2025" },
-        { label: "Employment Type", value: employmentInfo?.employment_type || employeeProfile?.employment_type || "Permanent" },
-        { label: "Work Mode", value: employmentInfo?.work_mode || employeeProfile?.work_mode || "Hybrid" },
-        { label: "Location", value: employmentInfo?.office_location || employeeProfile?.city || employeeProfile?.location || "Nagpur" },
+        { label: "Employee Code", value: employeeProfile?.employee_code },
+        { label: "Designation", value: employeeProfile?.designation },
+        { label: "Department", value: employeeProfile?.department },
+        { label: "Team", value: employeeProfile?.team },
+        { label: "Employment Type", value: employeeProfile?.employment_type },
+        { label: "Work Mode", value: employeeProfile?.work_mode },
     ];
-
+    const skillNames = Array.isArray(employeeProfile?.skills)
+        ? employeeProfile.skills.filter(Boolean).join(" · ")
+        : "";
   return (
     <>
 <div className="px-0 px-md-5 employee-dashboard">
@@ -110,34 +53,34 @@ export default function EmployeeProfile({ currentUser, employeeProfile }) {
                         <div className="esc-employee-main">
 
                             <div className="esc-avatar">
-                                {bannerInitials}
+                                {employeeInitials}
                             </div>
 
                             <div className="esc-employee-info">
                                 <div className="esc-name-row">
-                                    <h3>{displayName}</h3>
+                                    <h3>{employeeName}</h3>
                                     <span className="esc-status-badge">
                                         <span></span>
                                         Active
                                     </span>
                                 </div>
 
-                                <p>{employmentInfo?.designation || profile?.designation || employeeProfile?.designation || "Employee"}</p>
+                                <p>{employeeProfile?.designation || "Employee"}</p>
 
                                 <div className="esc-employee-meta">
                                     <span>
                                         <i className="bi bi-diagram-3"></i>
-                                        {employmentInfo?.department || profile?.department || employeeProfile?.department || "Engineering"}
+                                        {employeeProfile?.department || "Department"}
                                     </span>
 
                                     <span>
                                         <i className="bi bi-code-slash"></i>
-                                        {employmentInfo?.team || profile?.team || employeeProfile?.team || "Backend"}
+                                        {employeeProfile?.team || "Team"}
                                     </span>
 
                                     <span>
                                         <i className="bi bi-person-badge"></i>
-                                        {profile?.employee_code || employeeProfile?.employee_code || "—"}
+                                        {employeeProfile?.employee_code || "EMP-0000"}
                                     </span>
                                 </div>
                             </div>
@@ -192,10 +135,10 @@ export default function EmployeeProfile({ currentUser, employeeProfile }) {
                                 Assets
                             </button>
 
-                            <button type="button" className="ep-profile-tab" data-profile-tab="access">
+                            {/* <button type="button" className="ep-profile-tab" data-profile-tab="access">
                                 <i className="bi bi-shield-lock"></i>
                                 Access
-                            </button>
+                            </button> */}
 
                         </div>
 
@@ -231,14 +174,12 @@ export default function EmployeeProfile({ currentUser, employeeProfile }) {
                                     </div>
 
 
-                                    {error && <p className="text-danger px-3">{error}</p>}
-
                                     <div className="row g-0 ep-information-grid">
 
                                         {personalItems.map((item) => (
                                             <div className="col-md-6 ep-information-item" key={item.label}>
                                                 <span>{item.label}</span>
-                                                <strong>{loading ? "Loading..." : item.value || "-"}</strong>
+                                                <strong>{item.value || "-"}</strong>
                                             </div>
                                         ))}
 
@@ -272,7 +213,7 @@ export default function EmployeeProfile({ currentUser, employeeProfile }) {
                                         {employmentItems.map((item) => (
                                             <div className="col-md-6 ep-information-item" key={item.label}>
                                                 <span>{item.label}</span>
-                                                <strong>{loading ? "Loading..." : item.value || "-"}</strong>
+                                                <strong>{item.value || "-"}</strong>
                                             </div>
                                         ))}
 
@@ -338,7 +279,7 @@ export default function EmployeeProfile({ currentUser, employeeProfile }) {
                                                     <span>Skills</span>
 
                                                     <strong className="ep-skill-preview">
-                                                        React ┬╖ Laravel ┬╖ MySQL
+                                                        {!employeeProfile ? "Loading skills..." : skillNames || "No skills listed"}
                                                     </strong>
                                                 </div>
 
@@ -545,23 +486,7 @@ export default function EmployeeProfile({ currentUser, employeeProfile }) {
 
 
                                     
-                                    {/* <div className="ep-person-card">
-
-                                        <div className="ep-person-avatar ep-avatar-pink">
-                                            AR
-                                        </div>
-
-                                        <div className="ep-person-info">
-                                            <span>HR Manager</span>
-                                            <strong>Anita Rao</strong>
-                                            <small>Human Resources</small>
-                                        </div>
-
-                                        <button type="button">
-                                            <i className="bi bi-chevron-right"></i>
-                                        </button>
-
-                                    </div> */}
+                                    
 
                                 </div>
 
