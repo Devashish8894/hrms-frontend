@@ -724,7 +724,7 @@ export default function EmployeeTemplate({
                                             data-work-location="office" aria-label="Office, WFO">
                                             <i className="bi bi-geo-alt-fill" aria-hidden="true"></i>
                                             <span id="edWorkLocationLabel">{employeeProfile?.city || "Office"}</span>
-                                            <strong id="edWorkMode">{employeeProfile?.work_mode || "WFO"}</strong>
+                                            <strong id="edWorkMode">{employeeProfile?.work_mode === "Remote" ? "WFH" : employeeProfile?.work_mode === "Office" ? "WFO" : employeeProfile?.work_mode || "Hybrid"}</strong>
                                         </div>
                                     </div>
 
