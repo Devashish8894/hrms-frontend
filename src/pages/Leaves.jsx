@@ -3,11 +3,12 @@ import React, { useState, useEffect } from "react";
 import Chart from "react-apexcharts";
 
 export default function Leaves({ currentUser, employeeProfile }) {
-  const [data, setData] = useState({ balances: [], approvers: [], requests: [] });
+  const [data, setData] = useState({ balances: [], leaveTypes: [], approvers: [], requests: [] });
   const [loading, setLoading] = useState(true);
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [submittingLeave, setSubmittingLeave] = useState(false);
   const [leaveSubmitError, setLeaveSubmitError] = useState("");
+  const [alertBanner, setAlertBanner] = useState(null); // { type: 'success' | 'danger', message: '' }
   const [openDropdown, setOpenDropdown] = useState(null);
   const [selectedLeave, setSelectedLeave] = useState(null);
   const [viewLeave, setViewLeave] = useState(null);
@@ -35,12 +36,33 @@ export default function Leaves({ currentUser, employeeProfile }) {
   
   const [filterStatus, setFilterStatus] = useState('All Status');
   const [filterType, setFilterType] = useState('All Leave Type');
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
+  const handleCancelLeave = async (leaveId) => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/leaves/cancel/${leaveId}`, {
+        method: 'PUT'
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to cancel leave request');
+      setAlertBanner({ type: 'success', message: 'Leave request cancelled successfully!' });
+      setTimeout(() => setAlertBanner(null), 5000);
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      setAlertBanner({ type: 'danger', message: err.message || 'Failed to cancel leave request' });
+      setTimeout(() => setAlertBanner(null), 5000);
+    }
+  };
+
+  
+  const [previewDoc, setPreviewDoc] = useState(null); // { url, name }
+  const [editDocFile, setEditDocFile] = useState(null);
   
   const [formData, setFormData] = useState({
-    leaveTypeId: '', approverId: '', startDate: '', endDate: '', reason: ''
+    leaveTypeId: '', approverId: '', startDate: '', endDate: '', reason: '', documentFile: null
   });
   const [daysCalculated, setDaysCalculated] = useState(0);
 
@@ -52,9 +74,9 @@ export default function Leaves({ currentUser, employeeProfile }) {
       const result = await res.json();
       if (result.error) {
           console.error(result.error);
-          setData({ balances: [], approvers: [], requests: [] });
+          setData({ balances: [], leaveTypes: [], approvers: [], requests: [] });
       } else {
-          setData(result || { balances: [], approvers: [], requests: [] });
+          setData(result || { balances: [], leaveTypes: [], approvers: [], requests: [] });
       }
     } catch (err) {
       console.error(err);
@@ -65,48 +87,120 @@ export default function Leaves({ currentUser, employeeProfile }) {
 
   useEffect(() => { fetchData(); }, [currentUser]);
 
-  // Calculate days when dates change
-  useEffect(() => {
-    if (formData.startDate && formData.endDate) {
-      const start = new Date(formData.startDate);
-      const end = new Date(formData.endDate);
-      if (end >= start) {
-        const diffTime = Math.abs(end - start);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        setDaysCalculated(diffDays);
-      } else {
-        setDaysCalculated(0);
-      }
-    } else {
-      setDaysCalculated(0);
+  // Calculate min/max dates for leave application
+  const todayObj = new Date();
+  const pad2 = n => String(n).padStart(2, '0');
+  const formatYMD = dt => `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+  
+  const minDateObj = new Date(todayObj);
+  minDateObj.setDate(todayObj.getDate() - 2);
+  const minSelectableDate = formatYMD(minDateObj);
+
+  const maxDateObj = new Date(todayObj);
+  maxDateObj.setMonth(todayObj.getMonth() + 3);
+  const maxSelectableDate = formatYMD(maxDateObj);
+
+  // Helper: calculate working days skipping weekends and public holidays
+  const calculateWorkingDays = (startDateStr, endDateStr) => {
+    if (!startDateStr || !endDateStr) return 0;
+    const cleanStart = startDateStr.includes('T') ? startDateStr.split('T')[0] : startDateStr;
+    const cleanEnd = endDateStr.includes('T') ? endDateStr.split('T')[0] : endDateStr;
+    const [sY, sM, sD] = cleanStart.split('-').map(Number);
+    const [eY, eM, eD] = cleanEnd.split('-').map(Number);
+    const start = new Date(sY, sM - 1, sD);
+    const end = new Date(eY, eM - 1, eD);
+    if (end < start) return 0;
+    const holidayDatesSet = new Set(
+      (data.holidays || []).map(h => {
+        if (!h.holiday_date) return '';
+        const dt = new Date(h.holiday_date);
+        const pad = n => String(n).padStart(2, '0');
+        return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+      }).filter(Boolean)
+    );
+    let count = 0;
+    let cur = new Date(start);
+    while (cur <= end) {
+      const dayOfWeek = cur.getDay();
+      const pad = n => String(n).padStart(2, '0');
+      const curStr = `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}`;
+      const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+      const isHoliday = holidayDatesSet.has(curStr);
+      if (!isWeekend && !isHoliday) count++;
+      cur.setDate(cur.getDate() + 1);
     }
-  }, [formData.startDate, formData.endDate]);
+    return count;
+  };
+
+  // Calculate working days for apply modal
+  useEffect(() => {
+    setDaysCalculated(calculateWorkingDays(formData.startDate, formData.endDate));
+  }, [formData.startDate, formData.endDate, data.holidays]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmittingLeave(true);
+    if (submittingLeave) return;
     setLeaveSubmitError("");
+
+    // Form validation: other than document upload, all fields required
+    if (!formData.leaveTypeId) {
+      setLeaveSubmitError("Please select a leave type.");
+      return;
+    }
+    if (!formData.approverId) {
+      setLeaveSubmitError("Please select an approver.");
+      return;
+    }
+    if (!formData.startDate) {
+      setLeaveSubmitError("Please select a from date.");
+      return;
+    }
+    if (!formData.endDate) {
+      setLeaveSubmitError("Please select a to date.");
+      return;
+    }
+    if (formData.startDate < minSelectableDate || formData.startDate > maxSelectableDate) {
+      setLeaveSubmitError(`From Date must be between ${minSelectableDate} and ${maxSelectableDate}.`);
+      return;
+    }
+    if (formData.endDate < formData.startDate) {
+      setLeaveSubmitError("To Date cannot be earlier than From Date.");
+      return;
+    }
+    if (!formData.reason || !formData.reason.trim()) {
+      setLeaveSubmitError("Please enter a reason for your leave.");
+      return;
+    }
+
+    setSubmittingLeave(true);
     try {
+      const dataPayload = new FormData();
+      dataPayload.append('userId', currentUser.id);
+      dataPayload.append('leaveTypeId', formData.leaveTypeId);
+      dataPayload.append('approverId', formData.approverId);
+      dataPayload.append('startDate', formData.startDate);
+      dataPayload.append('endDate', formData.endDate);
+      dataPayload.append('days', daysCalculated);
+      dataPayload.append('reason', formData.reason.trim());
+      if (formData.documentFile) {
+        dataPayload.append('file', formData.documentFile);
+      }
+
       const response = await fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/leaves/apply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: currentUser.id,
-          leaveTypeId: formData.leaveTypeId,
-          approverId: formData.approverId,
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          days: daysCalculated,
-          reason: formData.reason
-        })
+        body: dataPayload
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Unable to submit leave request');
       setShowApplyModal(false);
-      setFormData({ leaveTypeId: '', approverId: '', startDate: '', endDate: '', reason: '' });
+      setFormData({ leaveTypeId: '', approverId: '', startDate: '', endDate: '', reason: '', documentFile: null });
+      setAlertBanner({ type: 'success', message: 'Leave request submitted successfully!' });
+      setTimeout(() => setAlertBanner(null), 5000);
       await fetchData();
     } catch (err) {
       setLeaveSubmitError(err.message || 'Unable to submit leave request');
+      setAlertBanner({ type: 'danger', message: err.message || 'Failed to submit leave request' });
+      setTimeout(() => setAlertBanner(null), 5000);
     } finally {
       setSubmittingLeave(false);
     }
@@ -124,6 +218,10 @@ export default function Leaves({ currentUser, employeeProfile }) {
   const holidaysCompletedCount = passedHolidays.length > 0 ? passedHolidays.length : 10;
   const holidaysRemainingCount = upcomingHolidays.length > 0 ? upcomingHolidays.length : Math.max(0, totalHolidays - holidaysCompletedCount);
   const holidayCompletedPercent = Math.round((holidaysCompletedCount / totalHolidays) * 100);
+
+  const orgLeaveTypes = (data.leaveTypes && data.leaveTypes.length > 0)
+    ? data.leaveTypes.map(lt => ({ id: lt.id, name: lt.name }))
+    : (data.balances || []).map(b => ({ id: b.leave_type_id, name: b.leave_type_name }));
 
   const computedBalances = (data.balances || []).map(b => {
       const typeName = b.leave_type_name;
@@ -219,7 +317,7 @@ export default function Leaves({ currentUser, employeeProfile }) {
       };
   });
 
-  const upcomingRequests = [...scheduledLeaves, ...scheduledHolidays]
+  const upcomingRequests = [...scheduledLeaves]
       .sort((a, b) => a.date - b.date)
       .slice(0, 3);
 
@@ -240,6 +338,15 @@ export default function Leaves({ currentUser, employeeProfile }) {
                     <div className="epl-page">
 
                         
+{alertBanner && (
+                            <div className={`alert alert-${alertBanner.type} alert-dismissible fade show mb-4`} role="alert" style={{ borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.06)' }}>
+                                <div className="d-flex align-items-center">
+                                    <i className={`bi ${alertBanner.type === 'success' ? 'bi-check-circle-fill text-success' : 'bi-exclamation-triangle-fill text-danger'} fs-5 me-2`}></i>
+                                    <strong>{alertBanner.message}</strong>
+                                </div>
+                                <button type="button" className="btn-close" onClick={() => setAlertBanner(null)} aria-label="Close"></button>
+                            </div>
+                        )}
                         <div className="epl-page-header">
 
                             <div>
@@ -308,11 +415,11 @@ export default function Leaves({ currentUser, employeeProfile }) {
                                         <span className="epl-balance-label">Annual Leave</span>
                                     </div>
                                     <div className="epl-balance-values">
-                                        <strong>{annualBalance.remaining_days}</strong>
+                                        <strong>{parseFloat(annualBalance.used_days || 0)}</strong>
                                         <span>/ {Number(annualBalance.total_days) === Math.floor(annualBalance.total_days) ? annualBalance.total_days.toString().split(".")[0] : annualBalance.total_days} Days</span>
                                     </div>
-                                    <div className="epl-progress-track">
-                                        <div className="epl-progress-bar" style={{ width: `${Math.round((parseFloat(annualBalance.used_days) / (parseFloat(annualBalance.total_days) || 1)) * 100)}%` }}></div>
+                                    <div className="epl-progress">
+                                        <div className="epl-progress-bar" style={{ width: `${Math.min(100, Math.round((parseFloat(annualBalance.used_days || 0) / (parseFloat(annualBalance.total_days) || 1)) * 100))}%` }}></div>
                                     </div>
                                     <div className="epl-balance-bottom d-flex justify-content-between align-items-center mt-2">
                                         <span>{annualBalance.remaining_days} days remaining</span>
@@ -331,11 +438,11 @@ export default function Leaves({ currentUser, employeeProfile }) {
                                         <span className="epl-balance-label">Sick Leave</span>
                                     </div>
                                     <div className="epl-balance-values">
-                                        <strong>{sickBalance.remaining_days}</strong>
+                                        <strong>{parseFloat(sickBalance.used_days || 0)}</strong>
                                         <span>/ {Number(sickBalance.total_days) === Math.floor(sickBalance.total_days) ? sickBalance.total_days.toString().split(".")[0] : sickBalance.total_days} Days</span>
                                     </div>
-                                    <div className="epl-progress-track">
-                                        <div className="epl-progress-bar" style={{ width: `${Math.round((parseFloat(sickBalance.used_days) / (parseFloat(sickBalance.total_days) || 1)) * 100)}%` }}></div>
+                                    <div className="epl-progress">
+                                        <div className="epl-progress-bar" style={{ width: `${Math.min(100, Math.round((parseFloat(sickBalance.used_days || 0) / (parseFloat(sickBalance.total_days) || 1)) * 100))}%` }}></div>
                                     </div>
                                     <div className="epl-balance-bottom d-flex justify-content-between align-items-center mt-2">
                                         <span>{sickBalance.remaining_days} days remaining</span>
@@ -357,7 +464,7 @@ export default function Leaves({ currentUser, employeeProfile }) {
                                         <strong>{holidaysCompletedCount}</strong>
                                         <span>/ {totalHolidays} Days</span>
                                     </div>
-                                    <div className="epl-progress-track">
+                                    <div className="epl-progress">
                                         <div className="epl-progress-bar" style={{ width: `${holidayCompletedPercent}%` }}></div>
                                     </div>
                                     <div className="epl-balance-bottom d-flex justify-content-between align-items-center mt-2">
@@ -408,12 +515,12 @@ export default function Leaves({ currentUser, employeeProfile }) {
 
                                             <div className="epl-util-item">
                                                 <span><i className="epl-dot annual"></i>Annual Leave</span>
-                                                <strong>{annualBalance.used_days} / {annualBalance.total_days}</strong>
+                                                <strong>{annualBalance.used_days} / {Number(annualBalance.total_days) === Math.floor(annualBalance.total_days) ? annualBalance.total_days.toString().split(".")[0] : annualBalance.total_days}</strong>
                                             </div>
 
                                             <div className="epl-util-item">
                                                 <span><i className="epl-dot sick"></i>Sick Leave</span>
-                                                <strong>{sickBalance.used_days} / {sickBalance.total_days}</strong>
+                                                <strong>{sickBalance.used_days} / {Number(sickBalance.total_days) === Math.floor(sickBalance.total_days) ? sickBalance.total_days.toString().split(".")[0] : sickBalance.total_days}</strong>
                                             </div>
 
                                             <div className="epl-util-item">
@@ -507,7 +614,13 @@ export default function Leaves({ currentUser, employeeProfile }) {
 
                                         <i className="bi bi-search"></i>
 
-                                        <input type="text" id="eplLeaveSearch" placeholder="Search leave type or reason..." />
+                                        <input 
+                                            type="text" 
+                                            id="eplLeaveSearch" 
+                                            placeholder="Search leave type or reason..." 
+                                            value={searchQuery}
+                                            onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                                        />
 
                                     </div>
 
@@ -516,6 +629,7 @@ export default function Leaves({ currentUser, employeeProfile }) {
     <option value="Approved">Approved</option>
     <option value="Pending">Pending</option>
     <option value="Rejected">Rejected</option>
+    <option value="Cancelled">Cancelled</option>
 </select>
 
                                     <select id="eplTypeFilter" className="form-select epl-filter" value={filterType} onChange={e => {setFilterType(e.target.value); setCurrentPage(1);}}>
@@ -558,6 +672,12 @@ export default function Leaves({ currentUser, employeeProfile }) {
         let match = true;
         if (filterStatus !== 'All Status' && req.status !== filterStatus) match = false;
         if (filterType !== 'All Leave Type' && req.leave_type !== filterType) match = false;
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const typeMatch = (req.leave_type || '').toLowerCase().includes(q);
+            const reasonMatch = (req.reason || '').toLowerCase().includes(q);
+            if (!typeMatch && !reasonMatch) match = false;
+        }
         return match;
     });
     
@@ -567,7 +687,7 @@ export default function Leaves({ currentUser, employeeProfile }) {
     const paginated = filtered.slice(startIndex, startIndex + itemsPerPage);
     
     return paginated.map(req => {
-        const statusClass = req.status === 'Approved' ? 'success' : req.status === 'Rejected' ? 'danger' : 'warning';
+        const statusClass = req.status === 'Approved' ? 'success' : (req.status === 'Rejected' || req.status === 'Cancelled') ? 'danger' : 'warning';
         const startFmt = new Date(req.start_date).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}).replace(/ /g, ' ');
         const endFmt = new Date(req.end_date).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}).replace(/ /g, ' ');
         const appliedFmt = new Date(req.created_at).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}).replace(/ /g, ' ');
@@ -611,7 +731,23 @@ export default function Leaves({ currentUser, employeeProfile }) {
                                   </li>
                                   <li><button className="dropdown-item d-flex align-items-center gap-2 py-2 text-secondary" onClick={() => { setViewLeave(req); setIsEditMode(false); setOpenDropdownId(null); }}><i className="bi bi-eye" style={{fontSize: '14px'}}></i> View Details</button></li>
                                   <li><hr className="dropdown-divider m-0" /></li>
-                                  <li><button className="dropdown-item d-flex align-items-center gap-2 py-2 text-danger" onClick={() => setOpenDropdownId(null)}><i className="bi bi-trash" style={{fontSize: '14px'}}></i> Cancel</button></li>
+                                  <li>
+                                      {req.status === 'Pending' ? (
+                                          <button 
+                                              className="dropdown-item d-flex align-items-center gap-2 py-2 text-danger" 
+                                              onClick={() => {
+                                                  setOpenDropdownId(null);
+                                                  handleCancelLeave(req.id);
+                                              }}
+                                          >
+                                              <i className="bi bi-trash" style={{fontSize: '14px'}}></i> Cancel
+                                          </button>
+                                      ) : (
+                                          <span className="dropdown-item d-flex align-items-center gap-2 py-2 text-muted" style={{ cursor: 'not-allowed' }} title="Can only cancel pending leaves">
+                                              <i className="bi bi-trash" style={{fontSize: '14px'}}></i> Cancel
+                                          </span>
+                                      )}
+                                  </li>
                               </ul>
                           )}
                       </div>
@@ -633,6 +769,12 @@ export default function Leaves({ currentUser, employeeProfile }) {
         let match = true;
         if (filterStatus !== 'All Status' && req.status !== filterStatus) match = false;
         if (filterType !== 'All Leave Type' && req.leave_type !== filterType) match = false;
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const typeMatch = (req.leave_type || '').toLowerCase().includes(q);
+            const reasonMatch = (req.reason || '').toLowerCase().includes(q);
+            if (!typeMatch && !reasonMatch) match = false;
+        }
         return match;
     });
     const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
@@ -952,10 +1094,10 @@ export default function Leaves({ currentUser, employeeProfile }) {
                   <div className="row g-4">
                     {leaveSubmitError && <div className="col-12"><div className="alert alert-danger mb-0" role="alert">{leaveSubmitError}</div></div>}
                     <div className="col-md-6">
-                      <label className="form-label">Leave Type</label>
+                      <label className="form-label">Leave Type <span className="text-danger">*</span></label>
                       <select className="form-select" required value={formData.leaveTypeId} onChange={e => setFormData({...formData, leaveTypeId: e.target.value})}>
                         <option value="">Select Leave Type</option>
-                        {computedBalances.map(b => <option key={b.leave_type_id} value={b.leave_type_id}>{b.leave_type_name}</option>)}
+                        {orgLeaveTypes.map(lt => <option key={lt.id} value={lt.id}>{lt.name}</option>)}
                       </select>
                     </div>
                     <div className="col-md-6">
@@ -966,12 +1108,12 @@ export default function Leaves({ currentUser, employeeProfile }) {
                       </select>
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label">From Date</label>
-                      <input type="date" className="form-control" required value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+                      <label className="form-label">From Date <span className="text-danger">*</span></label>
+                      <input type="date" className="form-control" required min={minSelectableDate} max={maxSelectableDate} value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label">To Date</label>
-                      <input type="date" className="form-control" required value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
+                      <label className="form-label">To Date <span className="text-danger">*</span></label>
+                      <input type="date" className="form-control" required min={formData.startDate || minSelectableDate} max={maxSelectableDate} value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
                     </div>
                     <div className="col-md-6">
                       <label className="form-label">Number of Days</label>
@@ -979,17 +1121,18 @@ export default function Leaves({ currentUser, employeeProfile }) {
                     </div>
                     <div className="col-md-6">
                       <label className="form-label">Supporting Document</label>
-                      <input type="file" className="form-control" />
+                      <input type="file" className="form-control" onChange={e => setFormData({ ...formData, documentFile: e.target.files && e.target.files[0] ? e.target.files[0] : null })} />
                     </div>
                     <div className="col-12">
-                      <label className="form-label">Reason</label>
+                      <label className="form-label">Reason <span className="text-danger">*</span></label>
                       <textarea className="form-control" rows="3" placeholder="Enter reason for leave" required value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})}></textarea>
                     </div>
                   </div>
                 </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn epl-cancel-btn" onClick={() => setShowApplyModal(false)}>Cancel</button>
-                  <button type="submit" className="btn epl-primary-btn" disabled={submittingLeave}>{submittingLeave ? "Submitting..." : "Submit Leave"}</button>
+                <hr></hr>
+                <div className="modal-footer border-0 pt-0 px-4 pb-4 gap-2">
+                  <button type="button" className="btn" style={{ background: '#fff', border: '1px solid #e2e8f0', color: '#64748b', borderRadius: '10px', padding: '10px 24px', fontWeight: '500' }} onClick={() => setShowApplyModal(false)}>Cancel</button>
+                  <button type="submit" className="btn" style={{ background: '#3525b8', border: 'none', color: '#fff', borderRadius: '10px', padding: '10px 24px', fontWeight: '600', boxShadow: '0 4px 12px rgba(53,37,184,0.25)' }} disabled={submittingLeave}>{submittingLeave ? "Submitting..." : "Submit Leave"}</button>
                 </div>
               </form>
             </div>
@@ -1013,9 +1156,7 @@ export default function Leaves({ currentUser, employeeProfile }) {
                               <small className="text-muted d-block mb-1" style={{ fontSize: '13px' }}>Leave Type</small>
                               {isEditMode ? (
                                   <select className="form-select form-select-sm border-0 px-0 fw-bold shadow-none" value={viewLeave.leave_type || ''} onChange={(e) => setViewLeave({...viewLeave, leave_type: e.target.value})}>
-                                      <option value="Annual Leave">Annual Leave</option>
-                                      <option value="Sick Leave">Sick Leave</option>
-                                      <option value="Casual Leave">Casual Leave</option>
+                                      {orgLeaveTypes.map(lt => <option key={lt.id} value={lt.name}>{lt.name}</option>)}
                                   </select>
                               ) : (
                                   <strong className="d-block text-dark">{viewLeave.leave_type || '--'}</strong>
@@ -1026,7 +1167,11 @@ export default function Leaves({ currentUser, employeeProfile }) {
                           <div className="p-3 rounded" style={{ border: '1px solid #eaeaea' }}>
                               <small className="text-muted d-block mb-1" style={{ fontSize: '13px' }}>From Date</small>
                               {isEditMode ? (
-                                  <input type="date" className="form-control form-control-sm border-0 px-0 fw-bold shadow-none" value={viewLeave.start_date ? new Date(viewLeave.start_date).toISOString().split('T')[0] : ''} onChange={(e) => setViewLeave({...viewLeave, start_date: e.target.value})} />
+                                  <input type="date" className="form-control form-control-sm border-0 px-0 fw-bold shadow-none" value={viewLeave.start_date ? (viewLeave.start_date.includes('T') ? viewLeave.start_date.split('T')[0] : new Date(viewLeave.start_date).toISOString().split('T')[0]) : ''} onChange={(e) => {
+                                      const newStart = e.target.value;
+                                      const newDays = calculateWorkingDays(newStart, viewLeave.end_date);
+                                      setViewLeave({...viewLeave, start_date: newStart, days_requested: newDays});
+                                  }} />
                               ) : (
                                   <strong className="d-block text-dark">{viewLeave.start_date ? new Date(viewLeave.start_date).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}).replace(/ /g, '-') : '--'}</strong>
                               )}
@@ -1036,7 +1181,11 @@ export default function Leaves({ currentUser, employeeProfile }) {
                           <div className="p-3 rounded" style={{ border: '1px solid #eaeaea' }}>
                               <small className="text-muted d-block mb-1" style={{ fontSize: '13px' }}>To Date</small>
                               {isEditMode ? (
-                                  <input type="date" className="form-control form-control-sm border-0 px-0 fw-bold shadow-none" value={viewLeave.end_date ? new Date(viewLeave.end_date).toISOString().split('T')[0] : ''} onChange={(e) => setViewLeave({...viewLeave, end_date: e.target.value})} />
+                                  <input type="date" className="form-control form-control-sm border-0 px-0 fw-bold shadow-none" value={viewLeave.end_date ? (viewLeave.end_date.includes('T') ? viewLeave.end_date.split('T')[0] : new Date(viewLeave.end_date).toISOString().split('T')[0]) : ''} onChange={(e) => {
+                                      const newEnd = e.target.value;
+                                      const newDays = calculateWorkingDays(viewLeave.start_date, newEnd);
+                                      setViewLeave({...viewLeave, end_date: newEnd, days_requested: newDays});
+                                  }} />
                               ) : (
                                   <strong className="d-block text-dark">{viewLeave.end_date ? new Date(viewLeave.end_date).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}).replace(/ /g, '-') : '--'}</strong>
                               )}
@@ -1070,7 +1219,40 @@ export default function Leaves({ currentUser, employeeProfile }) {
                       <div className="col-md-3">
                           <div className="p-3 rounded" style={{ border: '1px solid #eaeaea' }}>
                               <small className="text-muted d-block mb-1" style={{ fontSize: '13px' }}>Supporting Document</small>
-                              <strong className="d-block text-dark">Not Required</strong>
+                              {isEditMode ? (
+                                  <div>
+                                      <input type="file" className="form-control form-control-sm border-0 px-0 shadow-none" onChange={e => setEditDocFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)} />
+                                      {viewLeave.document_url && !editDocFile && (
+                                          <a 
+                                              href={viewLeave.document_url.startsWith('http') ? viewLeave.document_url : `${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}${viewLeave.document_url}`} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer" 
+                                              className="text-primary text-truncate d-inline-flex align-items-center gap-1 mt-1 text-decoration-none" 
+                                              style={{ fontSize: '11px', maxWidth: '140px', cursor: 'pointer' }} 
+                                              title={viewLeave.document_name || 'View current document in new tab'}
+                                          >
+                                              <i className="bi bi-box-arrow-up-right"></i> Current: {viewLeave.document_name || 'Document'}
+                                          </a>
+                                      )}
+                                  </div>
+                              ) : (
+                                  viewLeave.document_url ? (
+                                      <div className="d-flex align-items-center gap-1 mt-1">
+                                          <a 
+                                              href={viewLeave.document_url.startsWith('http') ? viewLeave.document_url : `${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}${viewLeave.document_url}`} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer" 
+                                              className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 py-1 px-2" 
+                                              style={{ fontSize: '12px', borderRadius: '6px' }}
+                                              title="Open document in new tab"
+                                          >
+                                              <i className="bi bi-box-arrow-up-right"></i> View Attachment
+                                          </a>
+                                      </div>
+                                  ) : (
+                                      <strong className="d-block text-muted">Not Required</strong>
+                                  )
+                              )}
                           </div>
                       </div>
       
@@ -1097,47 +1279,102 @@ export default function Leaves({ currentUser, employeeProfile }) {
                   {!isEditMode ? (
                       <>
                           {viewLeave.status === 'Pending' && (
-                              <button type="button" className="btn btn-outline-secondary px-4 fw-medium rounded-3 d-flex align-items-center gap-2" onClick={() => setIsEditMode(true)}>
+                              <button type="button" className="btn btn-outline-secondary px-4 fw-medium rounded-3 d-flex align-items-center gap-2" onClick={() => { setIsEditMode(true); setEditDocFile(null); }}>
                                   <i className="bi bi-pencil"></i> Edit
                               </button>
                           )}
-                          <button type="button" className="btn text-white px-4 fw-medium rounded-3 ms-auto" style={{ backgroundColor: '#4e36f5' }} onClick={() => setViewLeave(null)}>
+                          <button type="button" className="btn text-white px-4 fw-medium rounded-3 ms-auto" style={{ backgroundColor: '#4e36f5' }} onClick={() => { setViewLeave(null); setEditDocFile(null); }}>
                               Close
                           </button>
                       </>
                   ) : (
                       <>
-                          <button type="button" className="btn btn-outline-secondary px-4 fw-medium rounded-3" onClick={() => setIsEditMode(false)}>
+                          <button type="button" className="btn btn-outline-secondary px-4 fw-medium rounded-3" onClick={() => { setIsEditMode(false); setEditDocFile(null); }}>
                               Cancel
                           </button>
                           <button type="button" className="btn text-white px-4 fw-medium rounded-3 d-flex align-items-center gap-2 ms-auto" style={{ backgroundColor: '#4e36f5' }} onClick={async () => {
                               try {
+                                  const sDateStr = viewLeave.start_date ? (viewLeave.start_date.includes('T') ? viewLeave.start_date.split('T')[0] : viewLeave.start_date) : '';
+                                  const eDateStr = viewLeave.end_date ? (viewLeave.end_date.includes('T') ? viewLeave.end_date.split('T')[0] : viewLeave.end_date) : '';
+                                  
+                                  if (!sDateStr || !eDateStr) {
+                                      setAlertBanner({ type: 'danger', message: 'Please provide both From and To dates.' });
+                                      setTimeout(() => setAlertBanner(null), 5000);
+                                      return;
+                                  }
+                                  if (eDateStr < sDateStr) {
+                                      setAlertBanner({ type: 'danger', message: 'To Date cannot be earlier than From Date.' });
+                                      setTimeout(() => setAlertBanner(null), 5000);
+                                      return;
+                                  }
+
+                                  const updatePayload = new FormData();
+                                  updatePayload.append('leave_type', viewLeave.leave_type || '');
+                                  updatePayload.append('start_date', sDateStr);
+                                  updatePayload.append('end_date', eDateStr);
+                                  updatePayload.append('reason', viewLeave.reason || '');
+                                  if (editDocFile) {
+                                      updatePayload.append('file', editDocFile);
+                                  }
+
                                   const res = await fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/leaves/update/${viewLeave.id}`, {
                                       method: 'PUT',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                          leave_type: viewLeave.leave_type,
-                                          start_date: viewLeave.start_date,
-                                          end_date: viewLeave.end_date,
-                                          reason: viewLeave.reason
-                                      })
+                                      body: updatePayload
                                   });
                                   if (res.ok) {
                                       setIsEditMode(false);
                                       setViewLeave(null);
-                                      fetchData();
+                                      setEditDocFile(null);
+                                      setAlertBanner({ type: 'success', message: 'Leave request updated successfully!' });
+                                      setTimeout(() => setAlertBanner(null), 5000);
+                                      await fetchData();
                                   } else {
-                                      alert("Failed to save changes");
+                                      const errData = await res.json().catch(() => ({}));
+                                      setAlertBanner({ type: 'danger', message: errData.error || 'Failed to save changes' });
+                                      setTimeout(() => setAlertBanner(null), 5000);
                                   }
                               } catch (err) {
                                   console.error(err);
-                                  alert("Error saving changes");
+                                  setAlertBanner({ type: 'danger', message: 'Error saving changes: ' + (err.message || '') });
+                                  setTimeout(() => setAlertBanner(null), 5000);
                               }
                           }}>
                               <i className="bi bi-check2"></i> Save changes
                           </button>
                       </>
                   )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document In-Modal Preview Modal */}
+      {previewDoc && (
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 1060 }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxWidth: '850px' }}>
+            <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '14px', overflow: 'hidden' }}>
+              <div className="modal-header py-3 px-4 bg-light border-bottom d-flex align-items-center justify-content-between">
+                <h6 className="modal-title fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+                  <i className="bi bi-file-earmark-text text-primary"></i>
+                  <span className="text-truncate" style={{ maxWidth: '550px' }}>{previewDoc.name || 'Document Attachment'}</span>
+                </h6>
+                <div className="d-flex align-items-center gap-2">
+                  <a href={previewDoc.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" title="Open in new window">
+                    <i className="bi bi-box-arrow-up-right"></i> Open
+                  </a>
+                  <button type="button" className="btn-close" onClick={() => setPreviewDoc(null)}></button>
+                </div>
+              </div>
+              <div className="modal-body p-0 d-flex justify-content-center align-items-center" style={{ backgroundColor: '#1e293b', minHeight: '480px', maxHeight: '75vh', overflow: 'auto' }}>
+                {previewDoc.url && (previewDoc.url.toLowerCase().endsWith('.pdf') || (previewDoc.name && previewDoc.name.toLowerCase().endsWith('.pdf'))) ? (
+                  <iframe src={previewDoc.url} title="Document Preview" style={{ width: '100%', height: '540px', border: 'none' }} />
+                ) : (
+                  <img src={previewDoc.url} alt="Attachment Preview" style={{ maxWidth: '100%', maxHeight: '540px', objectFit: 'contain', padding: '12px' }} />
+                )}
+              </div>
+              <div className="modal-footer py-2 px-4 bg-light border-top">
+                <button type="button" className="btn btn-secondary btn-sm px-4 rounded-3" onClick={() => setPreviewDoc(null)}>Close Preview</button>
               </div>
             </div>
           </div>

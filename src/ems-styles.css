@@ -20144,7 +20144,7 @@ a {
 
 .employee-exit-page .exit-document-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
 }
 
@@ -20624,6 +20624,10 @@ a {
     .employee-exit-page .exit-side-column {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .employee-exit-page .exit-document-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 

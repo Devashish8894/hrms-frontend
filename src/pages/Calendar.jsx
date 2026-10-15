@@ -124,19 +124,20 @@ export default function Calendar({ employeeProfile, currentUser }) {
     const hol = holidays.find(h => isSameDay(new Date(h.holiday_date), date));
     if (hol) {
         events.push(
-            <div key={`hol-${hol.id || hol.holiday_name}`} className="calendar-event holiday" title={`Holiday: ${hol.holiday_name}`}>
-                <i className="legend-dot holiday"></i>
+            <div key={`hol-${hol.id || hol.holiday_name}`} className="calendar-event holiday" title={`Holiday: ${hol.holiday_name}`} onClick={() => { setModalData({ title: 'Public Holiday', type: 'holiday', holidayName: hol.holiday_name, holidayDate: hol.holiday_date }); setShowModal(true); }} style={{cursor: 'pointer'}}>
+                <i className="bi bi-flag-fill" style={{fontSize: '11px', color: '#b96816', marginRight: '4px'}}></i>
                 <span>{hol.holiday_name}</span>
             </div>
         );
     }
 
-    const lv = leaves.find(l => isDateBetween(date, l.start_date, l.end_date));
-    if (lv) {
+    const dayLeaves = leaves.filter(l => isDateBetween(date, l.start_date, l.end_date));
+    if (dayLeaves.length > 0) {
+        const lv = dayLeaves[0];
         events.push(
-            <div key={`lv-${lv.id}`} className="calendar-event special" title={`Leave (${lv.status}): ${lv.leave_type} - ${lv.reason}`}>
-                <i className="legend-dot special"></i>
-                <span>{lv.leave_type}</span>
+            <div key={`lv-${lv.id || date.getTime()}`} className="calendar-event special" title={`Leave (${lv.status}): ${lv.leave_type} - ${lv.reason || ''}`} onClick={() => { setModalData({ title: 'Leave Details', type: 'leave', list: dayLeaves }); setShowModal(true); }} style={{cursor: 'pointer'}}>
+                <i className="bi bi-calendar-check" style={{fontSize: '11px', color: '#3c2fbc', marginRight: '4px'}}></i>
+                <span>{dayLeaves.length > 1 ? `${dayLeaves.length} Leaves` : lv.leave_type}</span>
             </div>
         );
     }
@@ -199,11 +200,11 @@ export default function Calendar({ employeeProfile, currentUser }) {
                   <h1>Work Calendar</h1>
                   <p>View your work calendar, holidays, special days and team availability in one place.</p>
                 </div>
-                <div className="calendar-header-actions">
+                {/* <div className="calendar-header-actions">
                   <button className="calendar-action-btn secondary" onClick={() => setCurrentMonth(new Date())}>
                     <i className="bi bi-calendar-check"></i> Today
                   </button>
-                </div>
+                </div> */}
               </div>
 
               <section className="ed-hero" style={{ marginBottom: "25px" }}>
@@ -318,7 +319,7 @@ export default function Calendar({ employeeProfile, currentUser }) {
                 <section className="calendar-tab-content active" id="calendarTab">
                   <div className="calendar-layout">
                     
-                    <div className="calendar-main-card">
+                    <div className="calendar-main-card" style={{ maxHeight: "calc(100vh - 220px)", overflowY: "auto", overflowX: "auto" }}>
                       <div className="calendar-toolbar">
                         <div className="calendar-month-navigation">
                           <button className="month-nav-btn" onClick={prevMonth} aria-label="Previous month">
@@ -338,7 +339,7 @@ export default function Calendar({ employeeProfile, currentUser }) {
                         <span><i className="legend-dot team"></i> Anniversary / Week Off</span>
                       </div>
 
-                      <div className="calendar-grid-view">
+                      <div className="calendar-grid-view" style={{ minWidth: "650px" }}>
                         <div className="calendar-weekdays">
                           <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
                         </div>
@@ -541,24 +542,91 @@ export default function Calendar({ employeeProfile, currentUser }) {
         {/* Custom centered modal overlay */}
         {showModal && (
             <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowModal(false)}>
-                <div style={{ background: '#fff', borderRadius: '16px', width: '350px', maxWidth: '90%', boxShadow: '0 10px 30px rgba(0,0,0,0.15)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-                    <div style={{ background: modalData.type === 'birthday' ? 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)' : 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)', padding: '30px 20px', textAlign: 'center', position: 'relative' }}>
+                <div style={{ background: '#fff', borderRadius: '16px', width: '360px', maxWidth: '90%', boxShadow: '0 10px 30px rgba(0,0,0,0.15)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ 
+                        background: modalData.type === 'birthday' 
+                            ? 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)' 
+                            : modalData.type === 'anniversary'
+                            ? 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)'
+                            : modalData.type === 'holiday'
+                            ? 'linear-gradient(135deg, #ff9966 0%, #ff5e62 100%)'
+                            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                        padding: '30px 20px', 
+                        textAlign: 'center', 
+                        position: 'relative' 
+                    }}>
                         <button onClick={() => setShowModal(false)} style={{ position: 'absolute', top: '15px', right: '15px', border: 'none', background: 'rgba(255,255,255,0.3)', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', cursor: 'pointer', color: '#fff', lineHeight: 1 }}>&times;</button>
-                        <i className={`bi ${modalData.type === 'birthday' ? 'bi-cake2-fill' : 'bi-award-fill'}`} style={{ fontSize: '4.5rem', color: '#fff', dropShadow: '0 4px 6px rgba(0,0,0,0.1)' }}></i>
+                        <i className={`bi ${
+                            modalData.type === 'birthday' 
+                                ? 'bi-cake2-fill' 
+                                : modalData.type === 'anniversary'
+                                ? 'bi-award-fill'
+                                : modalData.type === 'holiday'
+                                ? 'bi-flag-fill'
+                                : 'bi-calendar-heart-fill'
+                        }`} style={{ fontSize: '4.5rem', color: '#fff', dropShadow: '0 4px 6px rgba(0,0,0,0.1)' }}></i>
                         <h4 style={{ margin: '15px 0 0', color: '#fff', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>{modalData.title}</h4>
                     </div>
-                    <div style={{ padding: '25px 20px', maxHeight: '300px', overflowY: 'auto', backgroundColor: '#fff' }}>
-                        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                            {modalData.list.map((name, i) => (
-                                <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: '#f8f9fa', borderRadius: '10px' }}>
-                                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: modalData.type === 'birthday' ? '#ffe5f1' : '#fff4d2', color: modalData.type === 'birthday' ? '#d63384' : '#ffc107', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '16px' }}>
-                                        {name.charAt(0).toUpperCase()}
+
+                    <div style={{ padding: '25px 20px', maxHeight: '320px', overflowY: 'auto', backgroundColor: '#fff' }}>
+                        {modalData.type === 'holiday' ? (
+                            <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                                <div style={{ fontSize: '18px', fontWeight: '700', color: '#24263d', marginBottom: '8px' }}>
+                                    {modalData.holidayName}
+                                </div>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '20px', background: '#fff3e6', color: '#b96816', fontSize: '14px', fontWeight: '600' }}>
+                                    <i className="bi bi-calendar-event"></i>
+                                    {modalData.holidayDate ? new Date(modalData.holidayDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+                                </div>
+                                <div style={{ marginTop: '16px', fontSize: '13px', color: '#6c757d' }}>
+                                    <i className="bi bi-building me-1"></i> Public Holiday · All offices closed
+                                </div>
+                            </div>
+                        ) : modalData.type === 'leave' ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {(modalData.list || []).map((lv, i) => (
+                                    <div key={i} style={{ padding: '12px', background: '#f8f9fa', borderRadius: '12px', borderLeft: '4px solid #667eea' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                            <span style={{ fontSize: '15px', fontWeight: '700', color: '#24263d' }}>{lv.leave_type || 'Leave'}</span>
+                                            <span style={{ 
+                                                fontSize: '11px', 
+                                                fontWeight: '700', 
+                                                padding: '2px 8px', 
+                                                borderRadius: '12px', 
+                                                background: lv.status === 'Approved' ? '#e6f7ec' : '#fff8e6', 
+                                                color: lv.status === 'Approved' ? '#28a745' : '#e6a100' 
+                                            }}>
+                                                {lv.status}
+                                            </span>
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px' }}>
+                                            <i className="bi bi-clock me-1"></i>
+                                            {new Date(lv.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                            {lv.end_date && !isSameDay(new Date(lv.start_date), new Date(lv.end_date)) ? ` - ${new Date(lv.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}
+                                            {lv.days_requested ? ` (${lv.days_requested} ${lv.days_requested > 1 ? 'days' : 'day'})` : ''}
+                                        </div>
+                                        {lv.reason && (
+                                            <div style={{ fontSize: '12px', color: '#495057', fontStyle: 'italic', background: '#fff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #edf2f7' }}>
+                                                "{lv.reason}"
+                                            </div>
+                                        )}
                                     </div>
-                                    <span style={{ fontSize: '16px', color: '#24263d', fontWeight: '600' }}>{name}</span>
-                                </li>
-                            ))}
-                        </ul>
+                                ))}
+                            </div>
+                        ) : (
+                            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                {(modalData.list || []).map((name, i) => (
+                                    <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: '#f8f9fa', borderRadius: '10px' }}>
+                                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: modalData.type === 'birthday' ? '#ffe5f1' : '#fff4d2', color: modalData.type === 'birthday' ? '#d63384' : '#ffc107', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '16px' }}>
+                                            {name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <span style={{ fontSize: '16px', color: '#24263d', fontWeight: '600' }}>{name}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </div>
+
                     <div style={{ padding: '15px 20px', borderTop: '1px solid #f1f3f5', textAlign: 'center', backgroundColor: '#fcfcfd' }}>
                         <button onClick={() => setShowModal(false)} className="btn btn-primary" style={{ background: '#24263d', borderColor: '#24263d', borderRadius: '8px', padding: '10px 30px', fontWeight: '600', width: '100%' }}>Awesome!</button>
                     </div>

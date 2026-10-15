@@ -26,6 +26,7 @@ export default function EmployeeTemplate({
   const [leavesData, setLeavesData] = useState({ balances: [], requests: [] });
   const [assetRequests, setAssetRequests] = useState([]);
   const [attendanceCorrections, setAttendanceCorrections] = useState([]);
+  const [employeeRequests, setEmployeeRequests] = useState([]);
   const [widgetsData, setWidgetsData] = useState({ nextHoliday: null, upcomingBirthday: null, upcomingAnniversary: null });
   const [todayWorkMode, setTodayWorkMode] = useState(employeeProfile?.work_mode || '');
 
@@ -157,6 +158,12 @@ export default function EmployeeTemplate({
                   if (data && data.corrections) setAttendanceCorrections(data.corrections);
               })
               .catch(console.error);
+          fetch(`${import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com"}/api/employee-requests/${currentUser.id}`)
+              .then(res => res.json())
+              .then(data => {
+                  if (data && data.requests) setEmployeeRequests(data.requests);
+              })
+              .catch(console.error);
       }
   }, [currentUser]);
 
@@ -243,45 +250,58 @@ export default function EmployeeTemplate({
       .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))[0] || 
       (leavesData.requests || []).filter(r => r.status === 'Pending' || r.status === 'Approved').sort((a, b) => new Date(b.start_date) - new Date(a.start_date))[0];
 
-  // Dynamic Recent Requests for Dashboard (Leave Requests, Asset Requests, Attendance Corrections)
-  const pendingLeave = (leavesData.requests || []).find(r => r.status === 'Pending') || (leavesData.requests || [])[0];
-  const pendingAsset = (assetRequests || []).find(r => r.status === 'Pending') || (assetRequests || [])[0];
-  const pendingCorrection = (attendanceCorrections || []).find(r => r.status === 'Pending') || (attendanceCorrections || [])[0];
+  // Dynamic Recent Requests for Dashboard strictly using employee_requests (Top 3)
+  const recentDashboardRequests = (employeeRequests || []).slice(0, 3).map((req) => {
+    let icon = "bi bi-chat-left-text";
+    let iconBg = "ed-request-purple";
+    let displayTitle = req.category || "Request";
+    let displaySubtitle = "";
 
-  const recentDashboardRequests = [
-      // 1. Dynamic Leave Request
-      pendingLeave ? {
-          id: `leave-${pendingLeave.id}`,
-          title: 'Leave Request',
-          subtitle: `REQ-${String(pendingLeave.id).padStart(6, '0')} · ${new Date(pendingLeave.start_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short'})}${pendingLeave.start_date !== pendingLeave.end_date ? ' - ' + new Date(pendingLeave.end_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short'}) : ''}`,
-          status: pendingLeave.status,
-          statusClass: pendingLeave.status === 'Approved' ? 'ed-request-approved' : pendingLeave.status === 'Rejected' ? 'ed-request-rejected' : 'ed-request-pending',
-          icon: 'bi bi-calendar2-check',
-          iconBg: 'ed-request-purple'
-      } : null,
+    const codeStr = req.request_code || (`REQ-${String(req.id).padStart(5, '0')}`);
+    const reqDate = req.created_at ? new Date(req.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : "";
 
-      // 2. Dynamic Asset Request
-      pendingAsset ? {
-          id: `asset-${pendingAsset.id}`,
-          title: `Asset Request (${pendingAsset.asset_type ? pendingAsset.asset_type.charAt(0).toUpperCase() + pendingAsset.asset_type.slice(1) : 'Hardware'})`,
-          subtitle: `${pendingAsset.request_code || 'REQ-' + String(pendingAsset.id).padStart(6, '0')} · ${pendingAsset.created_at ? new Date(pendingAsset.created_at).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : 'Recently submitted'}`,
-          status: pendingAsset.status,
-          statusClass: pendingAsset.status === 'Approved' ? 'ed-request-approved' : pendingAsset.status === 'Rejected' ? 'ed-request-rejected' : pendingAsset.status === 'In Progress' ? 'ed-request-progress' : 'ed-request-pending',
-          icon: 'bi bi-laptop',
-          iconBg: 'ed-request-orange'
-      } : null,
+    if (req.category === "Leave Request") {
+      icon = "bi bi-calendar2-check";
+      iconBg = "ed-request-purple";
+      displayTitle = "Leave Request";
+      if (req.start_date) {
+        const sDate = new Date(req.start_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+        const eDate = req.end_date ? new Date(req.end_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : sDate;
+        displaySubtitle = `${codeStr} · ${sDate}${sDate !== eDate ? ' - ' + eDate : ''}`;
+      } else {
+        displaySubtitle = `${codeStr} · ${reqDate}`;
+      }
+    } else if (req.category === "Asset Request") {
+      icon = "bi bi-laptop";
+      iconBg = "ed-request-orange";
+      const aType = req.asset_type ? req.asset_type.charAt(0).toUpperCase() + req.asset_type.slice(1) : (req.preferred_model || req.subject || "Hardware");
+      displayTitle = `Asset Request (${aType})`;
+      displaySubtitle = `${codeStr} · ${reqDate}`;
+    } else if (req.category === "Attendance Correction") {
+      icon = "bi bi-clock-history";
+      iconBg = "ed-request-blue";
+      displayTitle = "Attendance Correction";
+      displaySubtitle = `${codeStr} · ${reqDate}`;
+    } else {
+      displaySubtitle = `${codeStr} · ${reqDate}`;
+    }
 
-      // 3. Dynamic Attendance Correction Request
-      pendingCorrection ? {
-          id: `corr-${pendingCorrection.id}`,
-          title: 'Attendance Correction',
-          subtitle: `${pendingCorrection.request_code || 'REQ-' + String(pendingCorrection.id).padStart(6, '0')} · ${new Date(pendingCorrection.attendance_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'})}`,
-          status: pendingCorrection.status || 'Pending',
-          statusClass: pendingCorrection.status === 'Approved' ? 'ed-request-approved' : pendingCorrection.status === 'Rejected' ? 'ed-request-rejected' : pendingCorrection.status === 'Processing' ? 'ed-request-progress' : 'ed-request-pending',
-          icon: 'bi bi-clock-history',
-          iconBg: 'ed-request-blue'
-      } : null
-  ].filter(Boolean);
+    const st = (req.status || 'Pending').trim();
+    let statusClass = "ed-request-pending";
+    if (st.toLowerCase() === 'approved') statusClass = "ed-request-approved";
+    else if (st.toLowerCase() === 'rejected') statusClass = "ed-request-rejected";
+    else if (st.toLowerCase() === 'in progress' || st.toLowerCase() === 'in review') statusClass = "ed-request-progress";
+
+    return {
+      id: req.id,
+      title: displayTitle,
+      subtitle: displaySubtitle,
+      status: st,
+      statusClass,
+      icon,
+      iconBg
+    };
+  });
 
   const currentYear = new Date().getFullYear();
   const nationalHolidays = [
@@ -1012,7 +1032,7 @@ export default function EmployeeTemplate({
                                             <h3>My Leave Balance</h3>
                                         </div>
 
-                                        <button className="ed-text-action" onClick={(e) => { e.preventDefault(); setActivePage("leaves"); }}>
+                                        <button className="ed-text-action" onClick={(e) => { e.preventDefault(); navigateTo("leaves"); }}>
                                               Apply Leave
                                               <i className="bi bi-arrow-up-right"></i>
                                           </button>
@@ -1037,7 +1057,7 @@ export default function EmployeeTemplate({
                                           </React.Fragment>
                                       ))}
 
-                                    <div className="ed-leave-upcoming" style={{cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '15px', border: '1px solid #f1f3f5', borderRadius: '12px', marginTop: '15px'}} onClick={(e) => { e.preventDefault(); setActivePage("leaves"); }}>
+                                    <div className="ed-leave-upcoming" style={{cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '15px', border: '1px solid #f1f3f5', borderRadius: '12px', marginTop: '15px'}} onClick={(e) => { e.preventDefault(); navigateTo("leaves"); }}>
                                         <div className="ed-upcoming-icon" style={{ backgroundColor: '#f0f0ff', color: '#4e36f5', width: '36px', height: '36px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                             <i className="bi bi-calendar2-heart"></i>
                                         </div>
@@ -1121,7 +1141,7 @@ export default function EmployeeTemplate({
             <span className="ed-card-kicker">CELEBRATIONS</span>
             <h3>Special days this Month</h3>
         </div>
-        <button className="ed-text-action" onClick={(e) => { e.preventDefault(); setActivePage("calendar"); }}>
+        <button className="ed-text-action" onClick={(e) => { e.preventDefault(); navigateTo("calendar"); }}>
             View All
             <i className="bi bi-arrow-up-right"></i>
         </button>
@@ -1197,7 +1217,7 @@ export default function EmployeeTemplate({
                 </>
             ) : null}
         </span>
-        <button onClick={(e) => { e.preventDefault(); setActivePage("calendar"); }}>
+        <button onClick={(e) => { e.preventDefault(); navigateTo("calendar"); }}>
             View All
             <i className="bi bi-arrow-right"></i>
         </button>
@@ -1227,32 +1247,39 @@ export default function EmployeeTemplate({
                                             <h3>Recent requests</h3>
                                         </div>
 
-                                        <button className="ed-text-action">
+                                        <button className="ed-text-action" onClick={() => navigateTo("employee-requests")}>
                                             View all
                                             <i className="bi bi-arrow-up-right"></i>
                                         </button>
                                     </div>
 
                                     <div className="ed-request-list">
-                                        {recentDashboardRequests.map((req) => (
-                                            <div
-                                                className="ed-request-item"
-                                                key={req.id}
-                                            >
-                                                <div className={`ed-request-icon ${req.iconBg}`}>
-                                                    <i className={req.icon}></i>
-                                                </div>
+                                        {recentDashboardRequests.length > 0 ? (
+                                            recentDashboardRequests.map((req) => (
+                                                <div
+                                                    className="ed-request-item"
+                                                    key={req.id}
+                                                >
+                                                    <div className={`ed-request-icon ${req.iconBg}`}>
+                                                        <i className={req.icon}></i>
+                                                    </div>
 
-                                                <div className="ed-request-content">
-                                                    <strong>{req.title}</strong>
-                                                    <span>{req.subtitle}</span>
-                                                </div>
+                                                    <div className="ed-request-content">
+                                                        <strong>{req.title}</strong>
+                                                        <span>{req.subtitle}</span>
+                                                    </div>
 
-                                                <span className={`ed-request-status ${req.statusClass}`}>
-                                                    {req.status}
-                                                </span>
+                                                    <span className={`ed-request-status ${req.statusClass}`}>
+                                                        {req.status}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div style={{ padding: '24px 0', textAlign: 'center', color: '#85889b', fontSize: '13px' }}>
+                                                <i className="bi bi-inbox" style={{ fontSize: '28px', display: 'block', marginBottom: '8px', color: '#b0b3c6' }}></i>
+                                                No recent requests found.
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
 
                                 </div>
@@ -1597,13 +1624,13 @@ export default function EmployeeTemplate({
 {activePage === "employement-details" && <EmploymentDetails employeeProfile={employeeProfile} currentUser={currentUser} onProfileUpdate={fetchEmployeeProfile} />}
 {activePage === "documents" && <Documents employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "skills-certifications" && <SkillsCertifications employeeProfile={employeeProfile} currentUser={currentUser} />}
-{activePage === "attendance" && <Attendance currentUser={currentUser} employeeProfile={employeeProfile} />}
+{activePage === "attendance" && <Attendance currentUser={currentUser} employeeProfile={employeeProfile} onNavigate={navigateTo} />}
 {activePage === "leaves" && <Leaves currentUser={currentUser} employeeProfile={employeeProfile} />}
 {activePage === "assets" && <Assets employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "access-accounts" && <AccessAccounts employeeProfile={employeeProfile} />}
-{activePage === "notifications" && <Notifications employeeProfile={employeeProfile} />}
+{activePage === "notifications" && <Notifications currentUser={currentUser} employeeProfile={employeeProfile} />}
 {activePage === "settings" && <Settings employeeProfile={employeeProfile} currentUser={currentUser} onProfileUpdate={fetchEmployeeProfile} />}
-{activePage === "exit-management" && <ExitManagement employeeProfile={employeeProfile} currentUser={currentUser} />}
+{activePage === "exit-management" && <ExitManagement employeeProfile={employeeProfile} currentUser={currentUser} onNavigate={navigateTo} />}
 {activePage === "employee-requests" && <EmployeeRequests employeeProfile={employeeProfile} currentUser={currentUser} />}
 {activePage === "calendar" && <Calendar employeeProfile={employeeProfile} currentUser={currentUser} />}
         </div>
@@ -1659,5 +1686,3 @@ export default function EmployeeTemplate({
     </div>
   );
 }
-
-

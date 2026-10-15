@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { jsPDF } from "jspdf";
 
 const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -33,6 +34,61 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
   const [form, setForm] = useState({ resignationDate: toISO(new Date()), noticePeriod: 60, reason: "", comments: "", confirm: false });
 
   const userId = currentUser?.id || employeeProfile?.user_id;
+
+  const downloadResignationAcceptance = () => {
+    if (data?.resignation?.status !== "Approved") {
+      setToast({ type: "error", text: "The resignation acceptance letter is available after approval." });
+      return;
+    }
+
+    try {
+      const { employee, resignation } = data;
+      const doc = new jsPDF();
+      const companyName = employee.company_name || "Company";
+      const employeeName = [employee.first_name, employee.last_name].filter(Boolean).join(" ") || "Employee";
+      const left = 20;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const contentWidth = pageWidth - left * 2;
+      let y = 25;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text(companyName, left, y);
+      y += 16;
+      doc.setFontSize(18);
+      doc.text("Resignation Acceptance", left, y);
+      y += 13;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.text(`Date of approval: ${resignation.reviewed_at ? fmt(resignation.reviewed_at) : "Not recorded"}`, left, y);
+      y += 10;
+      doc.text(`Employee: ${employeeName}`, left, y);
+      y += 7;
+      doc.text(`Employee ID: ${employee.employee_code || "Not recorded"}`, left, y);
+      y += 7;
+      doc.text(`Department: ${employee.department || "Not recorded"}`, left, y);
+      y += 7;
+      doc.text(`Designation: ${employee.designation || "Not recorded"}`, left, y);
+      y += 14;
+
+      const body = `Dear ${employeeName},\n\nThis letter confirms that your resignation submitted on ${fmt(resignation.resignation_date)} has been approved. Your recorded last working day is ${fmt(resignation.last_working_day)}.\n\nWe appreciate your contributions to ${companyName} and wish you success in your future endeavors.`;
+      const lines = doc.splitTextToSize(body, contentWidth);
+      doc.text(lines, left, y);
+      y += lines.length * 6 + 14;
+      doc.text("Sincerely,", left, y);
+      y += 7;
+      doc.setFont("helvetica", "bold");
+      doc.text("Human Resources", left, y);
+
+      const employeeId = String(employee.employee_code || employee.employee_id).replace(/[^a-zA-Z0-9_-]/g, "-");
+      doc.save(`resignation-acceptance-${employeeId}.pdf`);
+      setToast({ type: "success", text: "Resignation acceptance PDF downloaded." });
+    } catch (e) {
+      console.error("Resignation acceptance PDF error:", e);
+      setToast({ type: "error", text: "Unable to generate the resignation acceptance PDF." });
+    }
+  };
 
   const load = useCallback(async (signal) => {
     setData(null);
@@ -153,7 +209,7 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
     const exitItems = data.checklist || [];
     const assetsDone = (pendingAssets || []).length === 0;
     const isDone = (item) => item.item_key === "asset_return"
-      ? assetsDone && item.status === "Completed"
+      ? assetsDone
       : item.status === "Completed";
     const approved = resignation.status === "Approved";
     const rejected = resignation.status === "Rejected";
@@ -217,7 +273,6 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
     { t: "Resignation Acceptance", icon: "bi-file-earmark-text", ok: resignation.status === "Approved", on: "PDF · Available", off: "Available after approval" },
     { t: "Experience Letter", icon: "bi-file-earmark-check", ok: allCleared, on: "PDF · Available", off: "Available after exit" },
     { t: "Relieving Letter", icon: "bi-file-earmark-medical", ok: allCleared, on: "PDF · Available", off: "Available after clearance" },
-    { t: "Final Settlement Statement", icon: "bi-receipt", ok: settlement?.status === "Paid", on: "PDF · Available", off: "Pending Finance clearance" },
   ] : [];
 
   return (
@@ -384,7 +439,7 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
                           <div className="exit-document-icon"><i className={`bi ${d.icon}`}></i></div>
                           <div><strong>{d.t}</strong><span>{d.ok ? d.on : d.off}</span></div>
                           {d.ok ? (
-                            <button className="exit-document-action" onClick={() => setToast({ type: "success", text: "Document download started." })}><i className="bi bi-download"></i></button>
+                            <button className="exit-document-action" onClick={d.t === "Resignation Acceptance" ? downloadResignationAcceptance : () => setToast({ type: "success", text: "Document download started." })} aria-label={`Download ${d.t}`}><i className="bi bi-download"></i></button>
                           ) : (
                             <button className="exit-document-action disabled" disabled><i className="bi bi-lock"></i></button>
                           )}

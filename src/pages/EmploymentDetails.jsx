@@ -149,6 +149,7 @@ export default function EmploymentDetails({ employeeProfile, currentUser, onProf
 
   const activePayslip = foundPayslip || null;
 
+  /*
   const handleUpdateWorkMode = async (mode) => {
     const targetId = profile.employee_id || currentUser?.id;
     if (!targetId) return;
@@ -175,6 +176,7 @@ export default function EmploymentDetails({ employeeProfile, currentUser, onProf
       setUpdating(false);
     }
   };
+  */
 
   // Formatter helper
   const formatDate = (dateString) => {
@@ -449,21 +451,21 @@ export default function EmploymentDetails({ employeeProfile, currentUser, onProf
                         </div>
                       </div>
                       <div className="work-mode-options">
-                        <div style={{cursor: 'pointer'}} onClick={() => handleUpdateWorkMode('Office')} className={`work-mode-card ${workMode === 'Office' ? 'is-selected' : ''}`}>
+                        <div /* onClick={() => handleUpdateWorkMode('Office')} */ className={`work-mode-card ${workMode === 'Office' ? 'is-selected' : ''}`}>
                           <span className="work-mode-content">
                             <span className="work-mode-icon"><i className="bi bi-building"></i></span>
                             <span><strong>Office</strong><small>Works from the office</small></span>
                             {workMode === 'Office' && <span className="work-mode-check"><i className="bi bi-check2"></i></span>}
                           </span>
                         </div>
-                        <div style={{cursor: 'pointer'}} onClick={() => handleUpdateWorkMode('Remote')} className={`work-mode-card ${workMode === 'Remote' ? 'is-selected' : ''}`}>
+                        <div /* onClick={() => handleUpdateWorkMode('Remote')} */ className={`work-mode-card ${workMode === 'Remote' ? 'is-selected' : ''}`}>
                           <span className="work-mode-content">
                             <span className="work-mode-icon"><i className="bi bi-house"></i></span>
                             <span><strong>Remote</strong><small>Works remotely</small></span>
                             {workMode === 'Remote' && <span className="work-mode-check"><i className="bi bi-check2"></i></span>}
                           </span>
                         </div>
-                        <div style={{cursor: 'pointer'}} onClick={() => handleUpdateWorkMode('Hybrid')} className={`work-mode-card ${workMode === 'Hybrid' || !workMode ? 'is-selected' : ''}`}>
+                        <div /* onClick={() => handleUpdateWorkMode('Hybrid')} */ className={`work-mode-card ${workMode === 'Hybrid' || !workMode ? 'is-selected' : ''}`}>
                           <span className="work-mode-content">
                             <span className="work-mode-icon"><i className="bi bi-arrow-left-right"></i></span>
                             <span><strong>Hybrid</strong><small>Office + remote</small></span>

@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+const API_BASE = import.meta.env.VITE_API_URL || (
+  ["localhost", "127.0.0.1"].includes(window.location.hostname)
+    ? "http://localhost:5002"
+    : "https://hrms-backend-5xo8.onrender.com"
+);
 const FILTERS = ["All Notifications", "Unread", "Important", "Archived"];
 const CATEGORIES = ["Leave", "Attendance", "Requests", "Assets", "IT Access", "Documents", "HR Announcement", "Celebrations"];
 const ICONS = {
@@ -15,6 +19,16 @@ const ICONS = {
 };
 const EMPTY_COUNTS = { total: 0, unread: 0, important: 0, read: 0, archived: 0 };
 
+async function readApiResponse(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(`Notifications API returned a non-JSON response (HTTP ${response.status}).`);
+  }
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || `Notifications request failed (HTTP ${response.status}).`);
+  return result;
+}
+
 function formatDate(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -28,8 +42,8 @@ function formatDate(value) {
   });
 }
 
-export default function Notifications({ currentUser, adminView = false }) {
-  const userId = currentUser?.id;
+export default function Notifications({ currentUser, employeeProfile, adminView = false }) {
+  const userId = currentUser?.id || employeeProfile?.user_id;
   const [notifications, setNotifications] = useState([]);
   const [counts, setCounts] = useState(EMPTY_COUNTS);
   const [activeFilter, setActiveFilter] = useState("All Notifications");
@@ -48,8 +62,7 @@ export default function Notifications({ currentUser, adminView = false }) {
     if (showLoading) setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/api/notifications/${encodeURIComponent(userId)}`, { signal });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Unable to load notifications.");
+      const result = await readApiResponse(response);
       setNotifications(Array.isArray(result.notifications) ? result.notifications : []);
       setCounts({ ...EMPTY_COUNTS, ...(result.counts || {}) });
       setError("");
@@ -102,8 +115,7 @@ export default function Notifications({ currentUser, adminView = false }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, ...update })
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Unable to update notification.");
+      const result = await readApiResponse(response);
       await loadNotifications();
     } catch (updateError) {
       setError(updateError.message || "Unable to update notification.");
@@ -118,8 +130,7 @@ export default function Notifications({ currentUser, adminView = false }) {
       const response = await fetch(`${API_BASE}/api/notifications/${encodeURIComponent(userId)}/read-all`, {
         method: "PATCH"
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Unable to mark notifications as read.");
+      const result = await readApiResponse(response);
       await loadNotifications();
     } catch (updateError) {
       setError(updateError.message || "Unable to mark notifications as read.");
