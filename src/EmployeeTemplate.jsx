@@ -15,6 +15,23 @@ import EmployeeRequests from "./pages/EmployeeRequests";
 import Calendar from "./pages/Calendar";
 import HRAssistant from "./components/HRAssistant";
 
+const SHORTCUT_CONFIG = {
+  "dashboard": { id: "dashboard", label: "Employee Dashboard", description: "Your workspace overview", icon: "bi-grid", color: "blue", page: "index" },
+  "apply-leave": { id: "apply-leave", label: "Apply Leave", description: "Request time off", icon: "bi-calendar-plus", color: "purple", page: "leaves" },
+  "attendance": { id: "attendance", label: "Attendance", description: "View attendance", icon: "bi-calendar-check", color: "blue", page: "attendance" },
+  "new-request": { id: "new-request", label: "New Request", description: "Contact HR / Admin", icon: "bi-send", color: "orange", page: "employee-requests" },
+  "documents": { id: "documents", label: "Documents", description: "My documents", icon: "bi-folder2-open", color: "green", page: "documents" },
+  "employment-details": { id: "employment-details", label: "Employment Details", description: "View your job information", icon: "bi-briefcase", color: "orange", page: "employement-details" },
+  "skills-certifications": { id: "skills-certifications", label: "Skills & Certifications", description: "Manage your qualifications", icon: "bi-award", color: "green", page: "skills-certifications" },
+  "assets": { id: "assets", label: "My Assets", description: "Assigned equipment", icon: "bi-laptop", color: "pink", page: "assets" },
+  "profile": { id: "profile", label: "My Profile", description: "View profile", icon: "bi-person", color: "dark", page: "employee-profile" },
+  "calendar": { id: "calendar", label: "Calendar", description: "View company events", icon: "bi-calendar-date", color: "blue", page: "calendar" },
+  "notifications": { id: "notifications", label: "Notifications", description: "View your updates", icon: "bi-bell", color: "pink", page: "notifications" },
+  "settings": { id: "settings", label: "Settings", description: "Manage your preferences", icon: "bi-gear", color: "dark", page: "settings" },
+  "exit-management": { id: "exit-management", label: "Resignation & Exit", description: "View exit information", icon: "bi-box-arrow-right", color: "orange", page: "exit-management" },
+  "access-accounts": { id: "access-accounts", label: "Access & Accounts", description: "View accounts", icon: "bi-shield-lock", color: "blue", page: "access-accounts" }
+};
+
 export default function EmployeeTemplate({
   currentUser, handleLogout,
   attendanceStatus, checkInTime, checkOutTime, workingTime,
@@ -29,6 +46,24 @@ export default function EmployeeTemplate({
   const [employeeRequests, setEmployeeRequests] = useState([]);
   const [widgetsData, setWidgetsData] = useState({ nextHoliday: null, upcomingBirthday: null, upcomingAnniversary: null });
   const [todayWorkMode, setTodayWorkMode] = useState(employeeProfile?.work_mode || '');
+  const [selectedShortcutIds, setSelectedShortcutIds] = useState([]);
+  const [shortcutsLoading, setShortcutsLoading] = useState(true);
+
+  const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+  const rawAvatar = employeeProfile?.profile_pic || employeeProfile?.avatar_url || "";
+  const dynamicAvatarUrl = rawAvatar
+    ? (/^https?:\/\//i.test(rawAvatar) ? rawAvatar : `${API_BASE}/${rawAvatar.replace(/^\/+/, "")}`)
+    : "";
+
+  useEffect(() => {
+    const handleProfilePicUpdate = () => {
+      if (typeof fetchEmployeeProfile === "function") {
+        fetchEmployeeProfile();
+      }
+    };
+    window.addEventListener("profilePicUpdated", handleProfilePicUpdate);
+    return () => window.removeEventListener("profilePicUpdated", handleProfilePicUpdate);
+  }, [fetchEmployeeProfile]);
 
   // Fetch today's work mode directly from employee_attendance for this employee
   useEffect(() => {
@@ -164,8 +199,53 @@ export default function EmployeeTemplate({
                   if (data && data.requests) setEmployeeRequests(data.requests);
               })
               .catch(console.error);
+
+          // Fetch dynamic shortcut selections for current employee
+          setShortcutsLoading(true);
+          const API_URL = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+          fetch(`${API_URL}/api/employee/shortcut-selections/${currentUser.id}`)
+              .then(res => {
+                  if (res.status === 404) {
+                      const localSaved = localStorage.getItem(`shortcut_selections_${currentUser.id}`);
+                      if (localSaved) {
+                          try { setSelectedShortcutIds(JSON.parse(localSaved)); } catch { setSelectedShortcutIds([]); }
+                      } else {
+                          setSelectedShortcutIds([]);
+                      }
+                      return null;
+                  }
+                  return res.json();
+              })
+              .then(data => {
+                  if (data && Array.isArray(data.shortcutIds)) {
+                      setSelectedShortcutIds(data.shortcutIds);
+                      localStorage.setItem(`shortcut_selections_${currentUser.id}`, JSON.stringify(data.shortcutIds));
+                  }
+              })
+              .catch(() => {
+                  const localSaved = localStorage.getItem(`shortcut_selections_${currentUser.id}`);
+                  if (localSaved) {
+                      try { setSelectedShortcutIds(JSON.parse(localSaved)); } catch { setSelectedShortcutIds([]); }
+                  }
+              })
+              .finally(() => {
+                  setShortcutsLoading(false);
+              });
       }
   }, [currentUser]);
+
+  // Listen for shortcut selection updates dispatched from Settings
+  useEffect(() => {
+      const handleShortcutUpdate = (event) => {
+          if (event.detail && Array.isArray(event.detail.shortcutIds)) {
+              if (!event.detail.userId || event.detail.userId === currentUser?.id) {
+                  setSelectedShortcutIds(event.detail.shortcutIds);
+              }
+          }
+      };
+      window.addEventListener('shortcutSelectionsUpdated', handleShortcutUpdate);
+      return () => window.removeEventListener('shortcutSelectionsUpdated', handleShortcutUpdate);
+  }, [currentUser?.id]);
 
   const [teamMembers, setTeamMembers] = useState([]);
 
@@ -547,13 +627,17 @@ export default function EmployeeTemplate({
 
                             <button className="profile-button" data-bs-toggle="dropdown">
 
-                                <div className="profile-avatar">
-                                    {(employeeProfile?.preferred_name
-                                        ? employeeProfile.preferred_name.slice(0, 2)
-                                        : employeeProfile?.first_name
-                                            ? `${employeeProfile.first_name[0]}${employeeProfile.last_name ? employeeProfile.last_name[0] : (employeeProfile.first_name[1] || "")}`
-                                            : currentUser.email.slice(0, 2)
-                                    ).toUpperCase()}
+                                <div className="profile-avatar overflow-hidden">
+                                    {dynamicAvatarUrl ? (
+                                        <img src={dynamicAvatarUrl} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "14px" }} />
+                                    ) : (
+                                        (employeeProfile?.preferred_name
+                                            ? employeeProfile.preferred_name.slice(0, 2)
+                                            : employeeProfile?.first_name
+                                                ? `${employeeProfile.first_name[0]}${employeeProfile.last_name ? employeeProfile.last_name[0] : (employeeProfile.first_name[1] || "")}`
+                                                : currentUser.email.slice(0, 2)
+                                        ).toUpperCase()
+                                    )}
                                 </div>
 
                                 <div className="profile-info">
@@ -664,8 +748,12 @@ export default function EmployeeTemplate({
                     
                     <section className="ed-hero">
                         <div className="ed-hero-main">
-                            <div className="ed-profile-avatar">
-                                <img src="https://i.pravatar.cc/150?img=12" alt={employeeProfile?.preferred_name || employeeProfile?.first_name || "Employee"} />
+                            <div className="ed-profile-avatar overflow-hidden">
+                                {dynamicAvatarUrl ? (
+                                    <img src={dynamicAvatarUrl} alt={employeeProfile?.preferred_name || employeeProfile?.first_name || "Employee"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                ) : (
+                                    <img src="https://i.pravatar.cc/150?img=12" alt={employeeProfile?.preferred_name || employeeProfile?.first_name || "Employee"} />
+                                )}
                                 <span className="ed-online-dot"></span>
                             </div>
 
@@ -943,75 +1031,102 @@ export default function EmployeeTemplate({
                     <section className="ed-section ed-quick-section">
 
                         <div className="ed-section-heading">
-                            <div>
-                                <span className="ed-section-label">SHORTCUTS</span>
-                                <h2>Quick Actions</h2>
+                            <div className="d-flex align-items-center justify-content-between w-100">
+                                <div>
+                                    <span className="ed-section-label">SHORTCUTS</span>
+                                    <h2>Quick Actions</h2>
+                                </div>
+                                <button
+                                    className="ed-text-action"
+                                    onClick={() => navigateTo("settings")}
+                                    style={{ background: 'transparent', border: 0, color: '#3c2fbc', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                                >
+                                    <i className="bi bi-gear me-1"></i>
+                                    Customize
+                                </button>
                             </div>
                         </div>
 
-                        <div className="row g-3">
-
-                            <div className="col-xl col-lg-3 col-md-4 col-6">
-                                <button className="ed-quick-card" onClick={() => navigateTo("leaves")}>
-                                    <span className="ed-quick-icon ed-q-purple">
-                                        <i className="bi bi-calendar-plus"></i>
-                                    </span>
-                                    <strong>Apply Leave</strong>
-                                    <small>Request time off</small>
+                        {shortcutsLoading ? (
+                            <div className="row g-3">
+                                {[1, 2, 3, 4].map((i) => (
+                                    <div className="col-xl col-lg-3 col-md-4 col-6" key={i}>
+                                        <div className="ed-quick-card" style={{ opacity: 0.6 }}>
+                                            <span className="ed-quick-icon ed-q-blue">
+                                                <i className="bi bi-hourglass-split"></i>
+                                            </span>
+                                            <strong>Loading...</strong>
+                                            <small>Fetching shortcuts</small>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : selectedShortcutIds.length > 0 ? (
+                            <div className="row g-3">
+                                {selectedShortcutIds
+                                    .map((id) => SHORTCUT_CONFIG[id])
+                                    .filter(Boolean)
+                                    .map((shortcut) => (
+                                        <div className="col-xl col-lg-3 col-md-4 col-6" key={shortcut.id}>
+                                            <button className="ed-quick-card" onClick={() => navigateTo(shortcut.page)}>
+                                                <span className={`ed-quick-icon ed-q-${shortcut.color}`}>
+                                                    <i className={`bi ${shortcut.icon}`}></i>
+                                                </span>
+                                                <strong>{shortcut.label}</strong>
+                                                <small>{shortcut.description}</small>
+                                            </button>
+                                        </div>
+                                    ))}
+                            </div>
+                        ) : (
+                            <div
+                                className="ed-quick-empty-card p-4 text-center"
+                                style={{
+                                    border: '1px dashed #d7d8e3',
+                                    borderRadius: '18px',
+                                    background: '#fafaff',
+                                    padding: '30px 20px'
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        width: '48px',
+                                        height: '48px',
+                                        borderRadius: '14px',
+                                        background: '#eeecff',
+                                        color: '#3c2fbc',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '22px',
+                                        marginBottom: '12px'
+                                    }}
+                                >
+                                    <i className="bi bi-star"></i>
+                                </div>
+                                <h6 style={{ fontWeight: 700, color: '#24263d', marginBottom: '6px' }}>
+                                    No shortcuts selected
+                                </h6>
+                                <p style={{ color: '#85889b', fontSize: '13px', margin: '0 0 14px' }}>
+                                    You haven't selected any shortcut icons yet. Customize your workspace by selecting quick actions in Settings.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => navigateTo("settings")}
+                                    className="btn btn-sm"
+                                    style={{
+                                        background: '#3c2fbc',
+                                        color: '#ffffff',
+                                        borderRadius: '10px',
+                                        padding: '7px 18px',
+                                        fontWeight: 600,
+                                        fontSize: '13px'
+                                    }}
+                                >
+                                    <i className="bi bi-plus-lg me-1"></i> Choose Shortcuts
                                 </button>
                             </div>
-
-                            <div className="col-xl col-lg-3 col-md-4 col-6">
-                                <button className="ed-quick-card" onClick={() => navigateTo("attendance")}>
-                                    <span className="ed-quick-icon ed-q-blue">
-                                        <i className="bi bi-calendar-check"></i>
-                                    </span>
-                                    <strong>Attendance</strong>
-                                    <small>View attendance</small>
-                                </button>
-                            </div>
-
-                            <div className="col-xl col-lg-3 col-md-4 col-6">
-                                <button className="ed-quick-card" onClick={() => navigateTo("employee-requests")}>
-                                    <span className="ed-quick-icon ed-q-orange">
-                                        <i className="bi bi-send"></i>
-                                    </span>
-                                    <strong>New Request</strong>
-                                    <small>Submit request</small>
-                                </button>
-                            </div>
-
-                            <div className="col-xl col-lg-3 col-md-4 col-6">
-                                <button className="ed-quick-card" onClick={() => navigateTo("documents")}>
-                                    <span className="ed-quick-icon ed-q-green">
-                                        <i className="bi bi-folder2-open"></i>
-                                    </span>
-                                    <strong>Documents</strong>
-                                    <small>My documents</small>
-                                </button>
-                            </div>
-
-                            <div className="col-xl col-lg-3 col-md-4 col-6">
-                                <button className="ed-quick-card" onClick={() => navigateTo("assets")}>
-                                    <span className="ed-quick-icon ed-q-pink">
-                                        <i className="bi bi-laptop"></i>
-                                    </span>
-                                    <strong>My Assets</strong>
-                                    <small>Assigned equipment</small>
-                                </button>
-                            </div>
-
-                            <div className="col-xl col-lg-3 col-md-4 col-6">
-                                <button className="ed-quick-card" onClick={() => navigateTo("employee-profile")}>
-                                    <span className="ed-quick-icon ed-q-dark">
-                                        <i className="bi bi-person"></i>
-                                    </span>
-                                    <strong>My Profile</strong>
-                                    <small>View profile</small>
-                                </button>
-                            </div>
-
-                        </div>
+                        )}
 
                     </section>
 

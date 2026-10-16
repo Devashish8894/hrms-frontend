@@ -39,7 +39,7 @@ const getLatestEligibleDateOfBirth = () => {
     return `${date.getFullYear()}-${month}-${day}`;
 };
 
-export default function Settings({ currentUser, employeeProfile }) {
+export default function Settings({ currentUser, employeeProfile, onProfileUpdate }) {
     const firstName = employeeProfile?.first_name || "";
     const lastName = employeeProfile?.last_name || "";
     const employeeName = `${firstName} ${lastName}`.trim() || currentUser?.email || "Employee";
@@ -401,6 +401,10 @@ export default function Settings({ currentUser, employeeProfile }) {
                 throw new Error(data.message || "Unable to upload profile picture.");
             }
             setPersonalInfo((current) => ({ ...(current || {}), profile_pic: data.profilePic }));
+            if (typeof onProfileUpdate === "function") {
+                onProfileUpdate();
+            }
+            window.dispatchEvent(new CustomEvent('profilePicUpdated', { detail: { profilePic: data.profilePic, userId: currentUser.id } }));
         } catch (error) {
             setProfilePictureError(error.message || "Unable to upload profile picture.");
         } finally {
@@ -425,6 +429,7 @@ export default function Settings({ currentUser, employeeProfile }) {
         setShortcutSelectionError("");
         try {
             localStorage.setItem(`shortcut_selections_${currentUser.id}`, JSON.stringify(nextShortcutIds));
+            window.dispatchEvent(new CustomEvent('shortcutSelectionsUpdated', { detail: { shortcutIds: nextShortcutIds, userId: currentUser.id } }));
             const response = await fetch(
                 `${API_BASE}/api/employee/shortcut-selections/${currentUser.id}`,
                 {
@@ -441,7 +446,9 @@ export default function Settings({ currentUser, employeeProfile }) {
             if (!response.ok) {
                 throw new Error(data.message || "Unable to save shortcut selections.");
             }
-            setSelectedShortcutIds(data.shortcutIds || nextShortcutIds);
+            const savedIds = data.shortcutIds || nextShortcutIds;
+            setSelectedShortcutIds(savedIds);
+            window.dispatchEvent(new CustomEvent('shortcutSelectionsUpdated', { detail: { shortcutIds: savedIds, userId: currentUser.id } }));
         } catch (error) {
             // Keep local selection if network/API failed
             console.warn("Shortcut selections API error:", error);

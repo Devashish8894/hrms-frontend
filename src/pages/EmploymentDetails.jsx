@@ -303,8 +303,18 @@ export default function EmploymentDetails({ employeeProfile, currentUser, onProf
 
                   <div className="esc-employee-bar">
                     <div className="esc-employee-main">
-                      <div className="esc-avatar">
-                        {getInitials(profile.first_name, profile.last_name)}
+                      <div className="esc-avatar overflow-hidden">
+                        {(employeeProfile?.profile_pic || employeeProfile?.avatar_url || profile?.profile_pic) ? (
+                          <img
+                            src={/^https?:\/\//i.test(employeeProfile?.profile_pic || employeeProfile?.avatar_url || profile?.profile_pic)
+                              ? (employeeProfile?.profile_pic || employeeProfile?.avatar_url || profile?.profile_pic)
+                              : `${import.meta.env.VITE_API_URL || 'https://hrms-backend-5xo8.onrender.com'}/${(employeeProfile?.profile_pic || employeeProfile?.avatar_url || profile?.profile_pic).replace(/^\/+/, '')}`}
+                            alt="Employee"
+                            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "17px" }}
+                          />
+                        ) : (
+                          getInitials(profile.first_name, profile.last_name)
+                        )}
                       </div>
                       <div className="esc-employee-info">
                         <div className="esc-name-row">

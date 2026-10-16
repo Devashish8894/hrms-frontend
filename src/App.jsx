@@ -362,6 +362,10 @@ export default function App() {
         try {
           const personalData = await personalRes.json();
           if (personalData) {
+            if (personalData.profile_pic) {
+              profileData.profile_pic = personalData.profile_pic;
+              profileData.avatar_url = personalData.profile_pic;
+            }
             if (personalData.preferred_name) {
               profileData.preferred_name = personalData.preferred_name;
             }

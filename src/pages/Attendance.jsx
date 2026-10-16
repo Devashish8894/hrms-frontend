@@ -258,9 +258,21 @@ export default function Attendance({ currentUser, employeeProfile, onNavigate, e
 
                             <div className="esc-employee-main">
 
-                                <div className="esc-avatar">
-    {employeeProfile?.first_name?.charAt(0) || currentUser.email.charAt(0).toUpperCase()}
-    {employeeProfile?.last_name?.charAt(0) || ""}
+                                <div className="esc-avatar overflow-hidden">
+    {(employeeProfile?.profile_pic || employeeProfile?.avatar_url) ? (
+      <img
+        src={/^https?:\/\//i.test(employeeProfile?.profile_pic || employeeProfile?.avatar_url)
+          ? (employeeProfile?.profile_pic || employeeProfile?.avatar_url)
+          : `${import.meta.env.VITE_API_URL || 'https://hrms-backend-5xo8.onrender.com'}/${(employeeProfile?.profile_pic || employeeProfile?.avatar_url).replace(/^\/+/, '')}`}
+        alt="Employee"
+        style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "17px" }}
+      />
+    ) : (
+      <>
+        {employeeProfile?.first_name?.charAt(0) || currentUser.email.charAt(0).toUpperCase()}
+        {employeeProfile?.last_name?.charAt(0) || ""}
+      </>
+    )}
   </div>
 
                                 <div className="esc-employee-info">

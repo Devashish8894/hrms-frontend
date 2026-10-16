@@ -31,6 +31,11 @@ export default function EmployeeProfile({ currentUser, employeeProfile, onProfil
     const skillNames = Array.isArray(employeeProfile?.skills)
         ? employeeProfile.skills.filter(Boolean).join(" · ")
         : "";
+    const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+    const rawAvatar = employeeProfile?.profile_pic || employeeProfile?.avatar_url || "";
+    const dynamicAvatarUrl = rawAvatar
+        ? (/^https?:\/\//i.test(rawAvatar) ? rawAvatar : `${API_BASE}/${rawAvatar.replace(/^\/+/, "")}`)
+        : "";
   return (
     <>
 <div className="px-0 px-md-5 employee-dashboard">
@@ -59,8 +64,12 @@ export default function EmployeeProfile({ currentUser, employeeProfile, onProfil
 
                         <div className="esc-employee-main">
 
-                            <div className="esc-avatar">
-                                {employeeInitials}
+                            <div className="esc-avatar overflow-hidden">
+                                {dynamicAvatarUrl ? (
+                                    <img src={dynamicAvatarUrl} alt={employeeName} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "17px" }} />
+                                ) : (
+                                    employeeInitials
+                                )}
                             </div>
 
                             <div className="esc-employee-info">

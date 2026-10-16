@@ -33,13 +33,23 @@ export default function AccessAccounts() {
 
                         <div className="esc-employee-main">
 
-                            <div className="esc-avatar">
-                                {(employeeProfile?.preferred_name
-                                    ? employeeProfile.preferred_name.slice(0, 2)
-                                    : employeeProfile?.first_name
-                                        ? `${employeeProfile.first_name[0]}${employeeProfile.last_name ? employeeProfile.last_name[0] : (employeeProfile.first_name[1] || "")}`
-                                        : "DA"
-                                ).toUpperCase()}
+                            <div className="esc-avatar overflow-hidden">
+                                {(employeeProfile?.profile_pic || employeeProfile?.avatar_url) ? (
+                                    <img
+                                        src={/^https?:\/\//i.test(employeeProfile?.profile_pic || employeeProfile?.avatar_url)
+                                            ? (employeeProfile?.profile_pic || employeeProfile?.avatar_url)
+                                            : `${import.meta.env.VITE_API_URL || 'https://hrms-backend-5xo8.onrender.com'}/${(employeeProfile?.profile_pic || employeeProfile?.avatar_url).replace(/^\/+/, '')}`}
+                                        alt="Employee"
+                                        style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "17px" }}
+                                    />
+                                ) : (
+                                    (employeeProfile?.preferred_name
+                                        ? employeeProfile.preferred_name.slice(0, 2)
+                                        : employeeProfile?.first_name
+                                            ? `${employeeProfile.first_name[0]}${employeeProfile.last_name ? employeeProfile.last_name[0] : (employeeProfile.first_name[1] || "")}`
+                                            : "DA"
+                                    ).toUpperCase()
+                                )}
                             </div>
 
                             <div className="esc-employee-info">

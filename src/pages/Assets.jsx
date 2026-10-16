@@ -239,7 +239,19 @@ export default function Assets({ currentUser, employeeProfile, embedded = false 
 
                     <div className={`esc-employee-bar${embedded ? " d-none" : ""}`}>
                         <div className="esc-employee-main">
-                            <div className="esc-avatar">{initials}</div>
+                            <div className="esc-avatar overflow-hidden">
+                                {(employeeProfile?.profile_pic || employeeProfile?.avatar_url) ? (
+                                    <img
+                                        src={/^https?:\/\//i.test(employeeProfile?.profile_pic || employeeProfile?.avatar_url)
+                                            ? (employeeProfile?.profile_pic || employeeProfile?.avatar_url)
+                                            : `${import.meta.env.VITE_API_URL || 'https://hrms-backend-5xo8.onrender.com'}/${(employeeProfile?.profile_pic || employeeProfile?.avatar_url).replace(/^\/+/, '')}`}
+                                        alt={fullName}
+                                        style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "17px" }}
+                                    />
+                                ) : (
+                                    initials
+                                )}
+                            </div>
 
                             <div className="esc-employee-info">
                                 <div className="esc-name-row">

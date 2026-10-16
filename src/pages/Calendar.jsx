@@ -209,8 +209,18 @@ export default function Calendar({ employeeProfile, currentUser }) {
 
               <section className="ed-hero" style={{ marginBottom: "25px" }}>
                 <div className="ed-hero-main">
-                  <div className="ed-profile-avatar">
-                    <img src="https://i.pravatar.cc/150?img=12" alt={profile?.preferred_name || profile?.first_name || "Employee"} />
+                  <div className="ed-profile-avatar overflow-hidden">
+                    {(employeeProfile?.profile_pic || employeeProfile?.avatar_url || profile?.profile_pic) ? (
+                      <img
+                        src={/^https?:\/\//i.test(employeeProfile?.profile_pic || employeeProfile?.avatar_url || profile?.profile_pic)
+                          ? (employeeProfile?.profile_pic || employeeProfile?.avatar_url || profile?.profile_pic)
+                          : `${import.meta.env.VITE_API_URL || 'https://hrms-backend-5xo8.onrender.com'}/${(employeeProfile?.profile_pic || employeeProfile?.avatar_url || profile?.profile_pic).replace(/^\/+/, '')}`}
+                        alt={profile?.preferred_name || profile?.first_name || "Employee"}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    ) : (
+                      <img src="https://i.pravatar.cc/150?img=12" alt={profile?.preferred_name || profile?.first_name || "Employee"} />
+                    )}
                     <span className="ed-online-dot"></span>
                   </div>
 
