@@ -26,6 +26,9 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [alertBanner, setAlertBanner] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const [interviewModal, setInterviewModal] = useState({ open: false, date: "" });
   const [toast, setToast] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -34,6 +37,11 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
   const [form, setForm] = useState({ resignationDate: toISO(new Date()), noticePeriod: 60, reason: "", comments: "", confirm: false });
 
   const userId = currentUser?.id || employeeProfile?.user_id;
+
+  const showAlert = (type, message) => {
+    setAlertBanner({ type, message });
+    setToast({ type: type === "danger" ? "error" : type, text: message });
+  };
 
   const downloadResignationAcceptance = () => {
     if (data?.resignation?.status !== "Approved") {
@@ -139,9 +147,9 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
   const run = async (url, method, body, message) => {
     try {
       await call(url, method, body);
-      setToast({ type: "success", text: message });
+      showAlert("success", message);
     } catch (e) {
-      setToast({ type: "error", text: e.message });
+      showAlert("danger", e.message);
     }
   };
 
@@ -175,7 +183,7 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
       if (editing) await call(`/api/exit/${data.resignation.id}`, "PUT", payload);
       else await call("/api/exit/resign", "POST", payload);
       setShowModal(false);
-      setToast({ type: "success", text: editing ? "Resignation updated successfully." : "Your resignation has been submitted." });
+      showAlert("success", editing ? "Resignation updated successfully." : "Your resignation has been submitted.");
     } catch (e) {
       setFormError(e.message);
     } finally {
@@ -183,15 +191,44 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
     }
   };
 
-  const withdraw = async () => {
-    if (!window.confirm("Withdraw your resignation?")) return;
-    run(`/api/exit/${data.resignation.id}/withdraw`, "POST", {}, "Your resignation has been withdrawn.");
+  const confirmWithdraw = () => {
+    setConfirmDialog({
+      title: "Withdraw Resignation?",
+      message: "Are you sure you want to withdraw your resignation? This will cancel your ongoing exit process.",
+      confirmLabel: "Yes, Withdraw",
+      cancelLabel: "Cancel",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await run(`/api/exit/${data.resignation.id}/withdraw`, "POST", {}, "Your resignation has been withdrawn.");
+      },
+    });
   };
 
-  const scheduleInterview = () => {
-    const date = window.prompt("Preferred exit interview date (YYYY-MM-DD):", addDays(toISO(new Date()), 1));
-    if (!date) return;
-    run(`/api/exit/${data.resignation.id}/interview`, "POST", { date }, "Exit interview scheduled.");
+  const openScheduleInterviewModal = () => {
+    const defaultDate = data?.resignation?.exit_interview_date
+      ? toISO(new Date(data.resignation.exit_interview_date))
+      : addDays(toISO(new Date()), 1);
+    setInterviewModal({ open: true, date: defaultDate });
+  };
+
+  const confirmScheduleInterview = async () => {
+    if (!interviewModal.date) return;
+    const dateVal = interviewModal.date;
+    setInterviewModal({ open: false, date: "" });
+    await run(`/api/exit/${data.resignation.id}/interview`, "POST", { date: dateVal }, "Exit interview scheduled.");
+  };
+
+  const confirmChecklistAction = (itemKey, title) => {
+    setConfirmDialog({
+      title: `Mark ${title} as Completed?`,
+      message: `Do you want to confirm that "${title}" has been completed?`,
+      confirmLabel: "Yes, Mark Completed",
+      cancelLabel: "Cancel",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await run(`/api/exit/${data.resignation.id}/checklist/${itemKey}`, "POST", {}, `${title} marked as completed.`);
+      },
+    });
   };
 
   if (loading) return <div className="px-0 px-md-5 employee-dashboard"><div className="employee-exit-page"><p>Loading…</p></div></div>;
@@ -251,7 +288,7 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
         return { key: i.item_key, title: i.title, done: itemDone,
           sub: itemDone ? `Completed on ${fmt(i.completed_at)}` : i.description,
           action: i.employee_can_complete && !itemDone && active
-            ? { label: "Mark Done", fn: () => run(`/api/exit/${resignation.id}/checklist/${i.item_key}`, "POST", {}, `${i.title} marked as completed.`) } : null };
+            ? { label: "Mark Done", fn: () => confirmChecklistAction(i.item_key, i.title) } : null };
       });
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -290,6 +327,42 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
               </button>
             )}
           </div>
+
+          {alertBanner && (
+            <div
+              className={`alert alert-${alertBanner.type || "info"} alert-dismissible fade show mb-4`}
+              role="alert"
+              style={{
+                borderRadius: "14px",
+                border: "0",
+                boxShadow: "0 6px 20px rgba(31, 35, 69, 0.08)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "14px 18px",
+              }}
+            >
+              <div className="d-flex align-items-center gap-2">
+                <i
+                  className={`bi ${
+                    alertBanner.type === "success"
+                      ? "bi-check-circle-fill text-success"
+                      : alertBanner.type === "danger"
+                      ? "bi-exclamation-triangle-fill text-danger"
+                      : "bi-info-circle-fill text-primary"
+                  } fs-5`}
+                ></i>
+                <span style={{ fontWeight: 600, fontSize: "14px" }}>{alertBanner.message}</span>
+              </div>
+              <button
+                type="button"
+                className="btn-close"
+                aria-label="Close"
+                onClick={() => setAlertBanner(null)}
+                style={{ position: "static", padding: "0.25rem 0.5rem" }}
+              ></button>
+            </div>
+          )}
 
           {!resignation ? (
             <div className="exit-card" style={{ textAlign: "center", padding: "48px 24px" }}>
@@ -482,7 +555,7 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
                       <div><span>Reason</span><strong>{resignation.reason || "—"}</strong></div>
                     </div>
                     {active && (
-                      <button className="exit-outline-btn full-width" style={{ marginTop: 16 }} onClick={withdraw}>
+                      <button className="exit-outline-btn full-width" style={{ marginTop: 16 }} onClick={confirmWithdraw}>
                         <i className="bi bi-arrow-counterclockwise"></i> Withdraw Resignation
                       </button>
                     )}
@@ -494,7 +567,7 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
                       <h3>Exit Interview</h3>
                       <p>Share your experience and feedback with the HR team before your final working day.</p>
                       {resignation.exit_interview_date && <p><strong>Scheduled: {fmt(resignation.exit_interview_date)}</strong></p>}
-                      <button className="exit-outline-btn full-width" onClick={scheduleInterview}>
+                      <button className="exit-outline-btn full-width" onClick={openScheduleInterviewModal}>
                         <i className="bi bi-calendar2-check"></i> {resignation.exit_interview_date ? "Reschedule Interview" : "Schedule Interview"}
                       </button>
                     </div>
@@ -572,6 +645,77 @@ export default function ExitManagement({ currentUser, employeeProfile, onNavigat
                 <button className="exit-secondary-btn" onClick={() => setShowModal(false)}>Cancel</button>
                 <button className="exit-primary-btn" onClick={submit} disabled={saving}>
                   <i className="bi bi-send"></i> {saving ? "Saving…" : editing ? "Save Changes" : "Submit Resignation"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className={`exit-modal-overlay ${interviewModal.open ? "show" : ""}`} style={{ zIndex: 10001 }}>
+            <div className="exit-modal" style={{ maxWidth: 460 }}>
+              <div className="exit-modal-header">
+                <div>
+                  <span className="exit-section-label">EXIT PROCESS</span>
+                  <h2>{data?.resignation?.exit_interview_date ? "Reschedule Exit Interview" : "Schedule Exit Interview"}</h2>
+                </div>
+                <button className="exit-modal-close" onClick={() => setInterviewModal({ open: false, date: "" })}>
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
+              <div className="exit-modal-body">
+                <p style={{ color: "#5f6174", fontSize: "14px", marginBottom: "16px" }}>
+                  Please choose your preferred date for the HR exit interview.
+                </p>
+                <div className="exit-form-group">
+                  <label>Preferred Date</label>
+                  <input
+                    type="date"
+                    min={toISO(new Date())}
+                    value={interviewModal.date}
+                    onChange={(e) => setInterviewModal((prev) => ({ ...prev, date: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="exit-modal-footer">
+                <button className="exit-secondary-btn" onClick={() => setInterviewModal({ open: false, date: "" })}>
+                  Cancel
+                </button>
+                <button
+                  className="exit-primary-btn"
+                  onClick={confirmScheduleInterview}
+                  disabled={!interviewModal.date}
+                >
+                  <i className="bi bi-calendar2-check"></i> Confirm Date
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className={`exit-modal-overlay ${confirmDialog ? "show" : ""}`} style={{ zIndex: 10002 }}>
+            <div className="exit-modal" style={{ maxWidth: 440 }}>
+              <div className="exit-modal-header">
+                <div>
+                  <span className="exit-section-label" style={{ color: "#e75b5b" }}>CONFIRMATION</span>
+                  <h2 style={{ fontSize: "19px" }}>{confirmDialog?.title || "Are you sure?"}</h2>
+                </div>
+                <button className="exit-modal-close" onClick={() => setConfirmDialog(null)}>
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
+              <div className="exit-modal-body">
+                <p style={{ margin: 0, color: "#47495b", fontSize: "14px", lineHeight: "1.5" }}>
+                  {confirmDialog?.message}
+                </p>
+              </div>
+              <div className="exit-modal-footer" style={{ gap: "10px" }}>
+                <button className="exit-secondary-btn" onClick={() => setConfirmDialog(null)}>
+                  {confirmDialog?.cancelLabel || "Cancel"}
+                </button>
+                <button
+                  className="exit-primary-btn"
+                  style={{ background: "#e75b5b", borderColor: "#e75b5b" }}
+                  onClick={() => confirmDialog?.onConfirm && confirmDialog.onConfirm()}
+                >
+                  {confirmDialog?.confirmLabel || "Yes, Proceed"}
                 </button>
               </div>
             </div>
