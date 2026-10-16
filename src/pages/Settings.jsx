@@ -3,6 +3,28 @@ import CharacterOnlyInput from "../utils/CharacterOnlyInput";
 import IntegerOnlyInput from "../utils/IntegerOnlyInput";
 
 const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+const EDIT_TRIGGER_STYLE = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    border: "1px solid #ded8ff",
+    borderRadius: 10,
+    backgroundColor: "#faf9ff",
+    color: "#3c2fbc",
+    padding: "11px 14px",
+    fontWeight: 650,
+    whiteSpace: "nowrap",
+    transition: "background-color .18s ease, border-color .18s ease, color .18s ease",
+};
+
+const setEditTriggerHover = (event, isHovered) => {
+    Object.assign(event.currentTarget.style, {
+        backgroundColor: isHovered ? "#3c2fbc" : "#faf9ff",
+        borderColor: isHovered ? "#3c2fbc" : "#ded8ff",
+        color: isHovered ? "#fff" : "#3c2fbc",
+    });
+};
 
 const readApiResponse = async (response) => {
     const contentType = response.headers.get("content-type") || "";
@@ -1104,7 +1126,7 @@ export default function Settings({ currentUser, employeeProfile, onProfileUpdate
                             <p>Your basic identity and personal details</p>
                         </div>
                     </div>
-                    <button className="btn es-edit-btn" type="button" onClick={openPersonalEdit}>
+                    <button className="btn" type="button" style={EDIT_TRIGGER_STYLE} onMouseEnter={(event) => setEditTriggerHover(event, true)} onMouseLeave={(event) => setEditTriggerHover(event, false)} onClick={openPersonalEdit}>
                         <i className="bi bi-pencil"></i> Edit
                     </button>
                 </div>
@@ -1134,7 +1156,7 @@ export default function Settings({ currentUser, employeeProfile, onProfileUpdate
                             <p>Your personal contact details and addresses</p>
                         </div>
                     </div>
-                    <button className="btn es-edit-btn" type="button" onClick={openContactEdit} >
+                    <button className="btn" type="button" style={EDIT_TRIGGER_STYLE} onMouseEnter={(event) => setEditTriggerHover(event, true)} onMouseLeave={(event) => setEditTriggerHover(event, false)} onClick={openContactEdit}>
                         <i className="bi bi-pencil"></i> Edit
                     </button>
                 </div>
@@ -1201,7 +1223,7 @@ export default function Settings({ currentUser, employeeProfile, onProfileUpdate
                             <p>Your salary account and payment information</p>
                         </div>
                     </div>
-                    <button className="btn es-bank-edit-trigger" type="button" onClick={openBankEdit}>
+                    <button className="btn" type="button" style={EDIT_TRIGGER_STYLE} onMouseEnter={(event) => setEditTriggerHover(event, true)} onMouseLeave={(event) => setEditTriggerHover(event, false)} onClick={openBankEdit}>
                         <i className="bi bi-pencil"></i> Request Update
                     </button>
                 </div>
@@ -1283,7 +1305,7 @@ export default function Settings({ currentUser, employeeProfile, onProfileUpdate
                             <p>Government-issued identity details</p>
                         </div>
                     </div>
-                    <button className="btn es-edit-btn" type="button" onClick={openIdentityEdit}>
+                    <button className="btn" type="button" style={EDIT_TRIGGER_STYLE} onMouseEnter={(event) => setEditTriggerHover(event, true)} onMouseLeave={(event) => setEditTriggerHover(event, false)} onClick={openIdentityEdit}>
                         <i className="bi bi-pencil"></i> Request Update
                     </button>
                 </div>
@@ -1328,7 +1350,7 @@ export default function Settings({ currentUser, employeeProfile, onProfileUpdate
                             <p>Person to contact in case of an emergency</p>
                         </div>
                     </div>
-                    <button className="btn es-edit-btn" type="button" onClick={openEmergencyEdit}>
+                    <button className="btn" type="button" style={EDIT_TRIGGER_STYLE} onMouseEnter={(event) => setEditTriggerHover(event, true)} onMouseLeave={(event) => setEditTriggerHover(event, false)} onClick={openEmergencyEdit}>
                         <i className="bi bi-pencil"></i> Edit
                     </button>
                 </div>
@@ -1561,7 +1583,7 @@ export default function Settings({ currentUser, employeeProfile, onProfileUpdate
             <div className="modal-header">
                 <div>
                     <h5 className="modal-title" id="esEditTitle">Update Personal Information</h5>
-                    <p className="es-modal-subtitle" id="esEditSubtitle">Update your personal information.</p>
+                    <p className="es-modal-subtitle" id="esEditSubtitle">Submit changes to your personal information for review.</p>
                 </div>
                 <button type="button" className="btn-close" aria-label="Close" onClick={() => setIsPersonalEditOpen(false)}></button>
             </div>
@@ -1634,8 +1656,8 @@ export default function Settings({ currentUser, employeeProfile, onProfileUpdate
                 </div>
             </div>
             <div className="modal-footer">
-                <button type="button" className="btn es-btn-light" onClick={() => setIsPersonalEditOpen(false)}>Cancel</button>
-                <button type="submit" className="btn es-btn-primary">
+                <button type="button" className="btn es-btn-light" style={{ minHeight: 46, padding: "11px 16px", borderRadius: 12, fontWeight: 600 }} onClick={() => setIsPersonalEditOpen(false)}>Cancel</button>
+                <button type="submit" className="btn es-btn-primary" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 46, padding: "11px 16px", borderRadius: 12, fontWeight: 600, backgroundColor: "#3c2fbc", borderColor: "#3c2fbc", color: "#fff" }}>
                     <i className={`bi ${personalEditSubmitting ? "bi-arrow-repeat" : "bi-send"}`}></i>
                     {personalEditSubmitting ? "Submitting..." : "Submit Update Request"}
                 </button>
@@ -1682,7 +1704,7 @@ export default function Settings({ currentUser, employeeProfile, onProfileUpdate
             </div>
             <div className="modal-footer">
                 <button type="button" className="btn es-btn-light" onClick={closeAccountRevealModal}>Cancel</button>
-                <button type="submit" className="btn es-btn-primary" >
+                <button type="submit" className="btn es-btn-primary">
                     {accountRevealLoading ? "Verifying..." : "Reveal Account Number"}
                 </button>
             </div>
@@ -1756,7 +1778,7 @@ export default function Settings({ currentUser, employeeProfile, onProfileUpdate
             </div>
             <div className="modal-footer">
                 <button type="button" className="btn es-btn-light" onClick={closeBankEdit}>Cancel</button>
-                <button type="submit" className="btn es-btn-primary" >
+                <button type="submit" className="btn es-btn-primary" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 46, padding: "11px 16px", borderRadius: 12, fontWeight: 600, backgroundColor: "#3c2fbc", borderColor: "#3c2fbc", color: "#fff" }}>
                     <i className={`bi ${bankEditSubmitting ? "bi-arrow-repeat" : "bi-send"}`}></i>
                     {bankEditSubmitting ? "Submitting..." : "Submit Update Request"}
                 </button>
@@ -1858,7 +1880,7 @@ export default function Settings({ currentUser, employeeProfile, onProfileUpdate
             </div>
             <div className="modal-footer">
                 <button type="button" className="btn es-btn-light" onClick={() => setIsContactEditOpen(false)}>Cancel</button>
-                <button type="submit" className="btn es-btn-primary" disabled={contactEditSubmitting}>
+                <button type="submit" className="btn es-btn-primary" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 46, padding: "11px 16px", borderRadius: 12, fontWeight: 600, backgroundColor: "#3c2fbc", borderColor: "#3c2fbc", color: "#fff" }} disabled={contactEditSubmitting}>
                     <i className={`bi ${contactEditSubmitting ? "bi-arrow-repeat" : "bi-check-lg"}`}></i>
                     {contactEditSubmitting ? "Saving..." : "Save Changes"}
                 </button>
@@ -1924,7 +1946,7 @@ export default function Settings({ currentUser, employeeProfile, onProfileUpdate
             </div>
             <div className="modal-footer">
                 <button type="button" className="btn es-btn-light" onClick={() => setIsIdentityEditOpen(false)}>Cancel</button>
-                <button type="submit" className="btn es-btn-primary" disabled={identityEditSubmitting}>
+                <button type="submit" className="btn es-btn-primary" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 46, padding: "11px 16px", borderRadius: 12, fontWeight: 600, backgroundColor: "#3c2fbc", borderColor: "#3c2fbc", color: "#fff" }} disabled={identityEditSubmitting}>
                     <i className={`bi ${identityEditSubmitting ? "bi-arrow-repeat" : "bi-send"}`}></i>
                     {identityEditSubmitting ? "Submitting..." : "Submit Update Request"}
                 </button>
@@ -2020,7 +2042,7 @@ export default function Settings({ currentUser, employeeProfile, onProfileUpdate
             </div>
             <div className="modal-footer">
                 <button type="button" className="btn es-btn-light" onClick={() => setIsEmergencyEditOpen(false)}>Cancel</button>
-                <button type="submit" className="btn es-btn-primary" disabled={emergencyEditSubmitting}>
+                <button type="submit" className="btn es-btn-primary" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 46, padding: "11px 16px", borderRadius: 12, fontWeight: 600, backgroundColor: "#3c2fbc", borderColor: "#3c2fbc", color: "#fff" }} disabled={emergencyEditSubmitting}>
                     {emergencyEditSubmitting ? "Saving..." : "Submit Update Request"}
                 </button>
             </div>

@@ -322,8 +322,33 @@ export default function EmployeeRequests({ employeeProfile, currentUser }) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Unable to submit employee request.");
-    await loadRequests();
+    const requestDate = new Date(result.request.created_at).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
+    const createdRequest = {
+      ...payload,
+      ...result.request,
+      category: payload.category,
+      subject: payload.subject,
+      description: payload.description,
+      priority: payload.priority || "Normal",
+      preferred_response: payload.preferredResponse || "Portal Notification",
+      attachment_name: payload.attachmentName || "",
+      status: result.request.status || "Pending",
+      request_date: requestDate
+    };
+    setRequests((currentRequests) => [
+      mapRequest(createdRequest),
+      ...currentRequests.filter((request) => request.id !== createdRequest.request_code)
+    ]);
+    setSearch("");
+    setStatusFilter("all");
+    setCategoryFilter("all");
     setPage(1);
+    setRequestError("");
+    void loadRequests();
     return result.request;
   };
 

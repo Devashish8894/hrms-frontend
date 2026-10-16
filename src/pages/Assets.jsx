@@ -111,7 +111,7 @@ export default function Assets({ currentUser, employeeProfile, embedded = false 
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Request failed");
       const modalEl = document.getElementById("eaAssignAssetModal");
-      window.bootstrap?.Modal.getInstance(modalEl)?.hide();
+    window.bootstrap?.Modal.getOrCreateInstance(modalEl)?.hide();
       setForm(emptyForm);
       setNotice({ type: "success", text: `Request ${result.request.request_code} submitted. It is now pending admin review.` });
       loadRequests();
