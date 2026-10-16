@@ -1,6 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
+import EmploymentDetails from "./EmploymentDetails";
+import Documents from "./Documents";
+import SkillsCertifications from "./SkillsCertifications";
+import Attendance from "./Attendance";
+import Leaves from "./Leaves";
+import Assets from "./Assets";
 
-export default function EmployeeProfile({ currentUser, employeeProfile }) {
+export default function EmployeeProfile({ currentUser, employeeProfile, onProfileUpdate }) {
+    const [activeProfileTab, setActiveProfileTab] = useState("overview");
     const firstName = employeeProfile?.first_name || "";
     const lastName = employeeProfile?.last_name || "";
     const employeeName = `${firstName} ${lastName}`.trim() || currentUser?.email || "Employee";
@@ -11,7 +18,7 @@ export default function EmployeeProfile({ currentUser, employeeProfile }) {
         { label: "First Name", value: firstName },
         { label: "Last Name", value: lastName },
         { label: "Email", value: employeeProfile?.email || currentUser?.email },
-        { label: "City", value: employeeProfile?.city },
+        { label: "City", value: employeeProfile?.current_city },
     ];
     const employmentItems = [
         { label: "Employee Code", value: employeeProfile?.employee_code },
@@ -100,37 +107,37 @@ export default function EmployeeProfile({ currentUser, employeeProfile }) {
 
                         <div className="ep-profile-tabs">
 
-                            <button type="button" className="ep-profile-tab active" data-profile-tab="overview">
+                            <button type="button" className={`ep-profile-tab${activeProfileTab === "overview" ? " active" : ""}`} data-profile-tab="overview" onClick={() => setActiveProfileTab("overview")}>
                                 <i className="bi bi-grid-1x2"></i>
                                 Overview
                             </button>
 
-                            <button type="button" className="ep-profile-tab" data-profile-tab="employment">
+                            <button type="button" className={`ep-profile-tab${activeProfileTab === "employment" ? " active" : ""}`} data-profile-tab="employment" onClick={() => setActiveProfileTab("employment")}>
                                 <i className="bi bi-briefcase"></i>
                                 Employment
                             </button>
 
-                            <button type="button" className="ep-profile-tab" data-profile-tab="documents">
+                            <button type="button" className={`ep-profile-tab${activeProfileTab === "documents" ? " active" : ""}`} data-profile-tab="documents" onClick={() => setActiveProfileTab("documents")}>
                                 <i className="bi bi-folder2"></i>
                                 Documents
                             </button>
 
-                            <button type="button" className="ep-profile-tab" data-profile-tab="skills">
+                            <button type="button" className={`ep-profile-tab${activeProfileTab === "skills" ? " active" : ""}`} data-profile-tab="skills" onClick={() => setActiveProfileTab("skills")}>
                                 <i className="bi bi-stars"></i>
                                 Skills
                             </button>
 
-                            <button type="button" className="ep-profile-tab" data-profile-tab="attendance">
+                            <button type="button" className={`ep-profile-tab${activeProfileTab === "attendance" ? " active" : ""}`} data-profile-tab="attendance" onClick={() => setActiveProfileTab("attendance")}>
                                 <i className="bi bi-calendar-check"></i>
                                 Attendance
                             </button>
 
-                            <button type="button" className="ep-profile-tab" data-profile-tab="leave">
+                            <button type="button" className={`ep-profile-tab${activeProfileTab === "leave" ? " active" : ""}`} data-profile-tab="leave" onClick={() => setActiveProfileTab("leave")}>
                                 <i className="bi bi-calendar2-minus"></i>
                                 Leave
                             </button>
 
-                            <button type="button" className="ep-profile-tab" data-profile-tab="assets">
+                            <button type="button" className={`ep-profile-tab${activeProfileTab === "assets" ? " active" : ""}`} data-profile-tab="assets" onClick={() => setActiveProfileTab("assets")}>
                                 <i className="bi bi-laptop"></i>
                                 Assets
                             </button>
@@ -146,7 +153,7 @@ export default function EmployeeProfile({ currentUser, employeeProfile }) {
 
 
                     
-                    <section className="ep-profile-content" id="profileOverview">
+                    <section className={`ep-profile-content${activeProfileTab === "overview" ? "" : " d-none"}`} id="profileOverview">
 
                         <div className="row g-4">
 
@@ -576,13 +583,46 @@ export default function EmployeeProfile({ currentUser, employeeProfile }) {
                     </section>
 
                     
-                    <section className="ep-profile-tab-content d-none" id="profileTabPlaceholder">
+                    {activeProfileTab === "employment" && (
+                        <EmploymentDetails
+                            employeeProfile={employeeProfile}
+                            currentUser={currentUser}
+                            onProfileUpdate={onProfileUpdate}
+                            embedded
+                        />
+                    )}
+
+                    {activeProfileTab === "documents" && (
+                        <Documents
+                            employeeProfile={employeeProfile}
+                            currentUser={currentUser}
+                            embedded
+                        />
+                    )}
+
+                    {activeProfileTab === "skills" && (
+                        <SkillsCertifications employeeProfile={employeeProfile} currentUser={currentUser} embedded />
+                    )}
+
+                    {activeProfileTab === "attendance" && (
+                        <Attendance employeeProfile={employeeProfile} currentUser={currentUser} embedded />
+                    )}
+
+                    {activeProfileTab === "leave" && (
+                        <Leaves employeeProfile={employeeProfile} currentUser={currentUser} embedded />
+                    )}
+
+                    {activeProfileTab === "assets" && (
+                        <Assets employeeProfile={employeeProfile} currentUser={currentUser} embedded />
+                    )}
+
+                    <section className={`ep-profile-tab-content${["overview", "employment", "documents", "skills", "attendance", "leave", "assets"].includes(activeProfileTab) ? " d-none" : ""}`} id="profileTabPlaceholder">
                         <div className="ep-placeholder-card">
                             <div className="ep-placeholder-icon">
                                 <i className="bi bi-window-stack"></i>
                             </div>
                             <h3 id="profilePlaceholderTitle">
-                                Employment
+                                {activeProfileTab.charAt(0).toUpperCase() + activeProfileTab.slice(1)}
                             </h3>
                             <p>
                                 This section will contain the employee's detailed

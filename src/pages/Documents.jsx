@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_SIZE = 2 * 1024 * 1024;
 const PAGE_SIZE = 4;
 const EXPIRING_WITHIN_DAYS = 90;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -45,7 +45,7 @@ const EMPTY_FORM = {
   remarks: "",
 };
 
-export default function Documents({ currentUser, employeeProfile }) {
+export default function Documents({ currentUser, employeeProfile, embedded = false }) {
     const firstName = employeeProfile?.first_name || "";
     const lastName = employeeProfile?.last_name || "";
     const employeeName = `${firstName} ${lastName}`.trim() || currentUser?.email || "Employee";
@@ -69,6 +69,8 @@ export default function Documents({ currentUser, employeeProfile }) {
   const [viewDoc, setViewDoc] = useState(null);
   const [editingDoc, setEditingDoc] = useState(null);
   const [actionError, setActionError] = useState("");
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleting, setDeleting] = useState(false);
 
   const openEdit = (doc) => {
     setEditingDoc(doc);
@@ -85,17 +87,26 @@ export default function Documents({ currentUser, employeeProfile }) {
     setIsUploadOpen(true);
   };
 
-  const deleteDocument = async (doc) => {
-    if (!window.confirm(`Delete "${doc.document_name || doc.document_type}"? This cannot be undone.`)) return;
+    const openDeleteConfirmation = (doc) => {
+        setActionError("");
+        setDeleteTarget(doc);
+    };
+
+    const deleteDocument = async () => {
+        if (!deleteTarget) return;
+
     try {
       setActionError("");
-      const response = await fetch(`${API_BASE}/api/employee/documents/${currentUser.id}/${doc.id}`, { method: "DELETE" });
+            setDeleting(true);
+            const response = await fetch(`${API_BASE}/api/employee/documents/${currentUser.id}/${deleteTarget.id}`, { method: "DELETE" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Delete failed");
-      loadDocuments();
+            setDeleteTarget(null);
+            await loadDocuments();
     } catch (err) {
       setActionError(err.message || "Delete failed");
-      loadDocuments();
+        } finally {
+            setDeleting(false);
     }
   };
 
@@ -192,7 +203,7 @@ export default function Documents({ currentUser, employeeProfile }) {
                 <button type="button" className="epd-edit-btn" title="Edit" onClick={() => openEdit(doc)}>
                   <i className="bi bi-pencil"></i>
                 </button>
-                <button type="button" className="epd-delete-btn" title="Delete" onClick={() => deleteDocument(doc)}>
+                <button type="button" className="epd-delete-btn" title="Delete" onClick={() => openDeleteConfirmation(doc)}>
                   <i className="bi bi-trash"></i>
                 </button>
               </>
@@ -263,10 +274,10 @@ export default function Documents({ currentUser, employeeProfile }) {
       });
     const data = await readApiResponse(response);
       if (!response.ok) throw new Error(data.message || "Upload failed");
-      setFeedback({ type: "success", text: data.message });
       setSelectedFile(null);
       setForm(EMPTY_FORM);
-      loadDocuments();
+    await loadDocuments();
+    closeUpload();
     } catch (err) {
       setFeedback({ type: "danger", text: err.message || "Upload failed" });
     } finally {
@@ -277,7 +288,8 @@ export default function Documents({ currentUser, employeeProfile }) {
   const pickFile = (file) => {
     if (!file) return;
     if (file.size > MAX_FILE_SIZE) {
-      setFileError("File size must be 10 MB or less.");
+            setSelectedFile(null);
+            setFileError("File size must be 2 MB or less.");
       return;
     }
     setFileError("");
@@ -293,7 +305,7 @@ export default function Documents({ currentUser, employeeProfile }) {
                     <div className="epd-page">
 
                         
-                        <div className="epd-header">
+                        {!embedded && <div className="epd-header">
 
                             <div>
                                 <h3>Documents</h3>
@@ -311,10 +323,10 @@ export default function Documents({ currentUser, employeeProfile }) {
 
                             </button>
 
-                        </div>
+                        </div>}
 
                         
-                        <div className="esc-employee-bar">
+                        {!embedded && <div className="esc-employee-bar">
 
                             <div className="esc-employee-main">
 
@@ -358,7 +370,7 @@ export default function Documents({ currentUser, employeeProfile }) {
                                 <strong>Total Documents</strong>
                             </div>
 
-                        </div>
+                        </div>}
 
                        
 
@@ -441,6 +453,12 @@ export default function Documents({ currentUser, employeeProfile }) {
                                 <span className="epd-list-count">
                                     {documents.length} Documents
                                 </span>
+                                {embedded && (
+                                    <button type="button" className="epd-upload-btn" onClick={() => setIsUploadOpen(true)}>
+                                        <i className="bi bi-cloud-arrow-up"></i>
+                                        Upload Document
+                                    </button>
+                                )}
 
                             </div>
 
@@ -740,7 +758,7 @@ export default function Documents({ currentUser, employeeProfile }) {
                                         </span>
 
                                         <small>
-                                            PDF, JPG, PNG, DOC, DOCX · Maximum 10 MB
+                                            PDF, JPG, PNG, DOC, DOCX · Maximum 2 MB
                                         </small>
 
                                     </div>
@@ -1014,6 +1032,45 @@ export default function Documents({ currentUser, employeeProfile }) {
 
                     </div>
 
+                </div>
+
+                {deleteTarget && <div className="modal-backdrop fade show" onClick={() => !deleting && setDeleteTarget(null)}></div>}
+
+                <div
+                    className={`modal fade${deleteTarget ? " show d-block" : ""}`}
+                    id="epdDeleteConfirmModal"
+                    tabIndex="-1"
+                    aria-hidden={!deleteTarget}
+                    aria-modal={deleteTarget ? true : undefined}
+                    role={deleteTarget ? "dialog" : undefined}
+                    onClick={(event) => {
+                        if (event.target === event.currentTarget && !deleting) setDeleteTarget(null);
+                    }}
+                >
+                    <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content epd-modal">
+                            <div className="modal-header">
+                                <div>
+                                    <span className="epd-modal-label">Employee Documents</span>
+                                    <h5 className="modal-title">Delete Document</h5>
+                                </div>
+                                <button type="button" className="btn-close" aria-label="Close" onClick={() => !deleting && setDeleteTarget(null)} disabled={deleting}></button>
+                            </div>
+                            <div className="modal-body">
+                                <p className="mb-0">
+                                    Delete <strong>{deleteTarget?.document_name || deleteTarget?.document_type}</strong>? This cannot be undone.
+                                </p>
+                                {actionError && <p className="text-danger mt-3 mb-0" role="alert">{actionError}</p>}
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="epd-modal-cancel" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</button>
+                                <button type="button" className="epd-modal-save" onClick={deleteDocument} disabled={deleting}>
+                                    <i className={`bi ${deleting ? "bi-arrow-repeat" : "bi-trash"}`}></i>
+                                    {deleting ? "Deleting..." : "Delete Document"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
             </div>

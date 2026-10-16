@@ -51,7 +51,7 @@ const EMPTY_SKILL_FORM = {
   lastUsed: "",
 };
 
-export default function SkillsCertifications({ currentUser, employeeProfile }) {
+export default function SkillsCertifications({ currentUser, employeeProfile, embedded = false }) {
   const employeeName = [employeeProfile?.first_name, employeeProfile?.last_name].filter(Boolean).join(" ")
     || currentUser?.email
     || "Employee";
@@ -61,6 +61,13 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
   const [certFile, setCertFile] = useState(null);
   const [certSubmitting, setCertSubmitting] = useState(false);
   const [certFeedback, setCertFeedback] = useState({ type: "", text: "" });
+  const [certMode, setCertMode] = useState("add");
+  const [selectedCert, setSelectedCert] = useState(null);
+  const [isCertDetailsOpen, setIsCertDetailsOpen] = useState(false);
+  const [openCertActionsId, setOpenCertActionsId] = useState(null);
+  const [certDeleteTarget, setCertDeleteTarget] = useState(null);
+  const [certDeleteSubmitting, setCertDeleteSubmitting] = useState(false);
+  const [certDeleteError, setCertDeleteError] = useState("");
   const [certs, setCerts] = useState([]);
   const [certsLoading, setCertsLoading] = useState(true);
   const [certsError, setCertsError] = useState("");
@@ -96,6 +103,35 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
           <div className="esc-cert-top">
             <div className={`esc-cert-logo ${CERT_LOGO_CLASSES[index % CERT_LOGO_CLASSES.length]}`}>
               <i className={`bi ${style.icon}`}></i>
+            </div>
+            <div className="dropdown esc-skill-actions">
+              <button
+                type="button"
+                className="btn esc-more-btn"
+                aria-label={`Actions for ${cert.certification_name}`}
+                aria-expanded={openCertActionsId === cert.id}
+                onClick={() => setOpenCertActionsId((currentId) => currentId === cert.id ? null : cert.id)}
+              >
+                <i className="bi bi-three-dots-vertical"></i>
+              </button>
+              <ul className={`dropdown-menu dropdown-menu-end esc-skill-dropdown${openCertActionsId === cert.id ? " show" : ""}`}>
+                <li>
+                  <button type="button" className="dropdown-item" onClick={() => { setOpenCertActionsId(null); setSelectedCert(cert); setIsCertDetailsOpen(true); }}>
+                    <i className="bi bi-eye"></i> Preview
+                  </button>
+                </li>
+                <li>
+                  <button type="button" className="dropdown-item" onClick={() => { setOpenCertActionsId(null); openEditCertification(cert); }}>
+                    <i className="bi bi-pencil"></i> Edit
+                  </button>
+                </li>
+                <li><hr className="dropdown-divider" /></li>
+                <li>
+                  <button type="button" className="dropdown-item text-danger" onClick={() => { setOpenCertActionsId(null); setCertDeleteError(""); setCertDeleteTarget(cert); }}>
+                    <i className="bi bi-trash"></i> Delete
+                  </button>
+                </li>
+              </ul>
             </div>
           </div>
 
@@ -153,6 +189,33 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
     setCertForm(EMPTY_CERT_FORM);
     setCertFile(null);
     setCertFeedback({ type: "", text: "" });
+    setCertMode("add");
+    setSelectedCert(null);
+  };
+
+  const openAddCertification = () => {
+    setCertMode("add");
+    setSelectedCert(null);
+    setCertForm(EMPTY_CERT_FORM);
+    setCertFile(null);
+    setCertFeedback({ type: "", text: "" });
+    setIsCertOpen(true);
+  };
+
+  const openEditCertification = (cert) => {
+    setCertMode("edit");
+    setSelectedCert(cert);
+    setCertForm({
+      skillCategory: cert.skill_category || "",
+      certificationName: cert.certification_name || "",
+      issuingOrganization: cert.issuing_organization || "",
+      certificateNumber: cert.certificate_number || "",
+      issueDate: cert.issue_date || "",
+      expiryDate: cert.expiry_date || "",
+    });
+    setCertFile(null);
+    setCertFeedback({ type: "", text: "" });
+    setIsCertOpen(true);
   };
 
   const pickCertFile = (event) => {
@@ -180,21 +243,41 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
     try {
       setCertSubmitting(true);
       setCertFeedback({ type: "", text: "" });
-      const response = await fetch(`${API_BASE}/api/employee/certifications/${currentUser.id}`, {
-        method: "POST",
+      const response = await fetch(`${API_BASE}/api/employee/certifications/${currentUser.id}${certMode === "edit" ? `/${selectedCert.id}` : ""}`, {
+        method: certMode === "edit" ? "PATCH" : "POST",
         body,
       });
       const data = await readApiResponse(response);
       if (!response.ok) throw new Error(data.message || "Failed to save certification");
-      setCertForm(EMPTY_CERT_FORM);
-      setCertFile(null);
-      setCertFeedback({ type: "success", text: data.message });
-      loadCerts();
+      closeCert();
+      await loadCerts();
     } catch (err) {
       setCertFeedback({ type: "danger", text: err.message || "Failed to save certification" });
     } finally {
       setCertSubmitting(false);
     }
+  };
+
+  const deleteCertification = async () => {
+    if (!certDeleteTarget) return;
+    try {
+      setCertDeleteSubmitting(true);
+      setCertDeleteError("");
+      const response = await fetch(`${API_BASE}/api/employee/certifications/${currentUser.id}/${certDeleteTarget.id}`, { method: "DELETE" });
+      const data = await readApiResponse(response);
+      if (!response.ok) throw new Error(data.message || "Failed to delete certification");
+      setCertDeleteTarget(null);
+      await loadCerts();
+    } catch (err) {
+      setCertDeleteError(err.message || "Failed to delete certification");
+    } finally {
+      setCertDeleteSubmitting(false);
+    }
+  };
+  const closeDeleteCertification = () => {
+    if (certDeleteSubmitting) return;
+    setCertDeleteTarget(null);
+    setCertDeleteError("");
   };
   const [isSkillOpen, setIsSkillOpen] = useState(false);
   const [skillMode, setSkillMode] = useState("add");
@@ -210,6 +293,9 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
   const [skillSearch, setSkillSearch] = useState("");
   const [skillCategoryFilter, setSkillCategoryFilter] = useState("");
   const [openSkillActionsId, setOpenSkillActionsId] = useState(null);
+  const [skillDeleteTarget, setSkillDeleteTarget] = useState(null);
+  const [skillDeleteSubmitting, setSkillDeleteSubmitting] = useState(false);
+  const [skillDeleteError, setSkillDeleteError] = useState("");
 
   const loadSkills = useCallback(async () => {
     if (!currentUser?.id) {
@@ -269,16 +355,33 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
     setIsSkillOpen(true);
   };
 
-  const deleteSkill = async (skill) => {
+  const openDeleteSkillConfirmation = (skill) => {
     setOpenSkillActionsId(null);
-    if (!window.confirm(`Delete ${skill.skill_name}?`)) return;
+    setSkillDeleteError("");
+    setSkillDeleteTarget(skill);
+  };
+
+  const closeDeleteSkillConfirmation = () => {
+    if (skillDeleteSubmitting) return;
+    setSkillDeleteTarget(null);
+    setSkillDeleteError("");
+  };
+
+  const deleteSkill = async () => {
+    if (!skillDeleteTarget) return;
+
     try {
-      const response = await fetch(`${API_BASE}/api/employee/skills/${currentUser.id}/${skill.id}`, { method: "DELETE" });
+      setSkillDeleteSubmitting(true);
+      setSkillDeleteError("");
+      const response = await fetch(`${API_BASE}/api/employee/skills/${currentUser.id}/${skillDeleteTarget.id}`, { method: "DELETE" });
       const data = await readApiResponse(response);
       if (!response.ok) throw new Error(data.message || "Failed to delete skill");
+      setSkillDeleteTarget(null);
       await loadSkills();
     } catch (err) {
-      setSkillsError(err.message || "Failed to delete skill");
+      setSkillDeleteError(err.message || "Failed to delete skill");
+    } finally {
+      setSkillDeleteSubmitting(false);
     }
   };
 
@@ -345,7 +448,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
             </li>
             <li><hr className="dropdown-divider" /></li>
             <li>
-              <button type="button" className="dropdown-item text-danger" onClick={() => deleteSkill(skill)}>
+              <button type="button" className="dropdown-item text-danger" onClick={() => openDeleteSkillConfirmation(skill)}>
                 <i className="bi bi-trash"></i> Delete Skill
               </button>
             </li>
@@ -407,7 +510,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
                     <div className="esc-page">
 
                         
-                        <div className="esc-page-header">
+                        <div className={`esc-page-header${embedded ? " d-none" : ""}`}>
                             <div>
                                 <div className="esc-breadcrumb">
                                     <span>Employee Profile</span>
@@ -431,7 +534,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
 
 
                         
-                        <div className="esc-employee-bar">
+                        <div className={`esc-employee-bar${embedded ? " d-none" : ""}`}>
 
                             <div className="esc-employee-main">
 
@@ -627,7 +730,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
                                     </div>
                                 </div>
 
-                                <button className="btn esc-btn-primary" id="escAddCertificationInline" type="button" onClick={() => setIsCertOpen(true)}>
+                                <button className="btn esc-btn-primary" id="escAddCertificationInline" type="button" onClick={openAddCertification}>
                                     <i className="bi bi-plus-lg"></i>
                                     Add Certification
                                 </button>
@@ -822,7 +925,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
                             if (event.target === event.currentTarget) setIsSkillDetailsOpen(false);
                           }}
                         >
-                          <div className="modal-dialog modal-dialog-centered">
+                          <div className="modal-dialog modal-dialog-centered esc-skill-details-dialog modal-lg">
                             <div className="modal-content esc-modal esc-skill-details-modal">
                               <div className="modal-header esc-modal-header">
                                 <div>
@@ -835,14 +938,35 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
                               </div>
                               <div className="modal-body">
                                 <div className="esc-skill-detail-grid">
-                                  <div><span>Category</span><strong>{selectedSkill.skill_category || "—"}</strong></div>
-                                  <div><span>Proficiency</span><strong>{selectedSkill.proficiency || "—"}</strong></div>
-                                  <div>
+                                  <div className="esc-skill-detail-item">
+                                    <span>Skill</span>
+                                    <strong>{selectedSkill.skill_category === "Others" && selectedSkill.other_skill ? selectedSkill.other_skill : selectedSkill.skill_name}</strong>
+                                  </div>
+                                  <div className="esc-skill-detail-item">
+                                    <span>Category</span>
+                                    <strong>{selectedSkill.skill_category || "—"}</strong>
+                                  </div>
+                                  <div className="esc-skill-detail-item">
+                                    <span>Proficiency</span>
+                                    <strong>{selectedSkill.proficiency || "—"}</strong>
+                                  </div>
+                                  <div className="esc-skill-detail-item">
                                     <span>Experience</span>
                                     <strong>{selectedSkill.years_of_experience == null ? "—" : `${selectedSkill.years_of_experience} ${Number(selectedSkill.years_of_experience) === 1 ? "year" : "years"}`}</strong>
                                   </div>
-                                  <div><span>Last Used</span><strong>{selectedSkill.last_used || "—"}</strong></div>
-                                  <div><span>Verification</span><strong>{selectedSkill.verification_status || "Pending"}</strong></div>
+                                  <div className="esc-skill-detail-item">
+                                    <span>Verification</span>
+                                    <strong className={selectedSkill.verification_status === "Verified" ? "esc-skill-detail-verified" : ""}>
+                                      {selectedSkill.verification_status === "Verified" && <i className="bi bi-patch-check-fill"></i>}
+                                      {selectedSkill.verification_status || "Pending"}
+                                    </strong>
+                                  </div>
+                                  <div className="esc-skill-detail-item">
+                                    <span>Proficiency Level</span>
+                                    <div className="esc-skill-proficiency-track">
+                                      <span style={{ width: `${LEVEL_WIDTH[selectedSkill.proficiency] || 25}%` }}></span>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                               <div className="modal-footer esc-modal-footer">
@@ -856,6 +980,46 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
                         </div>
                       </>
                     )}
+
+                    {skillDeleteTarget && <div className="modal-backdrop fade show" onClick={closeDeleteSkillConfirmation}></div>}
+
+                    <div
+                      className={`modal fade${skillDeleteTarget ? " show d-block" : ""}`}
+                      id="escDeleteSkillModal"
+                      tabIndex="-1"
+                      aria-hidden={!skillDeleteTarget}
+                      aria-modal={skillDeleteTarget ? true : undefined}
+                      role={skillDeleteTarget ? "dialog" : undefined}
+                      aria-labelledby="escDeleteSkillTitle"
+                      onClick={(event) => {
+                        if (event.target === event.currentTarget) closeDeleteSkillConfirmation();
+                      }}
+                    >
+                      <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content esc-modal">
+                          <div className="modal-header esc-modal-header">
+                            <div>
+                              <span className="esc-modal-label">Skills</span>
+                              <h5 className="modal-title" id="escDeleteSkillTitle">Delete Skill</h5>
+                            </div>
+                            <button type="button" className="btn-close" aria-label="Close" onClick={closeDeleteSkillConfirmation} disabled={skillDeleteSubmitting}></button>
+                          </div>
+                          <div className="modal-body">
+                            <p className="mb-0">
+                              Delete <strong>{skillDeleteTarget?.skill_category === "Others" && skillDeleteTarget?.other_skill ? skillDeleteTarget.other_skill : skillDeleteTarget?.skill_name}</strong>? This cannot be undone.
+                            </p>
+                            {skillDeleteError && <p className="text-danger mt-3 mb-0" role="alert">{skillDeleteError}</p>}
+                          </div>
+                          <div className="modal-footer esc-modal-footer">
+                            <button type="button" className="btn esc-cancel-btn" onClick={closeDeleteSkillConfirmation} disabled={skillDeleteSubmitting}>Cancel</button>
+                            <button type="button" className="btn btn-danger" onClick={deleteSkill} disabled={skillDeleteSubmitting}>
+                              <i className={`bi ${skillDeleteSubmitting ? "bi-arrow-repeat" : "bi-trash"}`}></i>
+                              {skillDeleteSubmitting ? "Deleting..." : "Delete Skill"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
                     {isCertOpen && <div className="modal-backdrop fade show" onClick={closeCert}></div>}
 
@@ -878,7 +1042,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
                                     <div>
                                         <span className="esc-modal-label">Certification Management</span>
                                         <h5 className="modal-title">
-                                            Add Certification
+                                            {certMode === "edit" ? "Edit Certification" : "Add Certification"}
                                         </h5>
                                     </div>
 
@@ -1002,8 +1166,8 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
                                                 <i className="bi bi-cloud-arrow-up"></i>
 
                                                 <span>
-                                                    <strong>{certFile ? certFile.name : "Choose certificate"}</strong>
-                                                    <small>PDF, JPG or PNG</small>
+                                                    <strong>{certFile?.name || (certMode === "edit" ? selectedCert?.file_name : "Choose certificate") || "Choose certificate"}</strong>
+                                                    <small>{certMode === "edit" && selectedCert?.file_name ? "Choose a file to replace the current certificate" : "PDF, JPG or PNG"}</small>
                                                 </span>
 
                                                 <input
@@ -1041,7 +1205,7 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
                                         disabled={certSubmitting}
                                     >
                                         <i className="bi bi-check-lg"></i>
-                                        {certSubmitting ? "Saving..." : "Save Certification"}
+                                        {certSubmitting ? "Saving..." : certMode === "edit" ? "Save Changes" : "Save Certification"}
                                     </button>
 
                                 </div>
@@ -1054,7 +1218,83 @@ export default function SkillsCertifications({ currentUser, employeeProfile }) {
 
 
                     
-                    <div className="toast-container position-fixed bottom-0 end-0 p-3">
+                                            {isCertDetailsOpen && selectedCert && (
+                                              <>
+                                                <div className="modal-backdrop fade show" onClick={() => setIsCertDetailsOpen(false)}></div>
+                                                <div
+                                                  className="modal fade show d-block"
+                                                  role="dialog"
+                                                  aria-modal="true"
+                                                  aria-labelledby="escCertPreviewTitle"
+                                                  onClick={(event) => {
+                                                    if (event.target === event.currentTarget) setIsCertDetailsOpen(false);
+                                                  }}
+                                                >
+                                                  <div className="modal-dialog modal-dialog-centered esc-skill-details-dialog modal-lg">
+                                                    <div className="modal-content esc-modal">
+                                                      <div className="modal-header esc-modal-header">
+                                                        <div>
+                                                          <span className="esc-modal-label">Certificate Preview</span>
+                                                          <h5 className="modal-title" id="escCertPreviewTitle">{selectedCert.certification_name}</h5>
+                                                        </div>
+                                                        <button type="button" className="btn-close" aria-label="Close" onClick={() => setIsCertDetailsOpen(false)}></button>
+                                                      </div>
+                                                      <div className="modal-body">
+                                                        <div className="esc-skill-detail-grid">
+                                                          <div className="esc-skill-detail-item"><span>Category</span><strong>{selectedCert.skill_category || "—"}</strong></div>
+                                                          <div className="esc-skill-detail-item"><span>Issuing Organization</span><strong>{selectedCert.issuing_organization || "—"}</strong></div>
+                                                          <div className="esc-skill-detail-item"><span>Certificate Number</span><strong>{selectedCert.certificate_number || "—"}</strong></div>
+                                                          <div className="esc-skill-detail-item"><span>Issue Date</span><strong>{formatCertDate(selectedCert.issue_date)}</strong></div>
+                                                          <div className="esc-skill-detail-item"><span>Expiry Date</span><strong>{formatCertDate(selectedCert.expiry_date)}</strong></div>
+                                                          <div className="esc-skill-detail-item"><span>Verification</span><strong className={selectedCert.verification_status === "Verified" ? "esc-skill-detail-verified" : ""}>{selectedCert.verification_status || "Pending"}</strong></div>
+                                                        </div>
+                                                      </div>
+                                                      <div className="modal-footer esc-modal-footer">
+                                                        <button type="button" className="btn esc-cancel-btn" onClick={() => setIsCertDetailsOpen(false)}>Close</button>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </>
+                                            )}
+
+                                            {certDeleteTarget && <div className="modal-backdrop fade show" onClick={closeDeleteCertification}></div>}
+                                            <div
+                                              className={`modal fade${certDeleteTarget ? " show d-block" : ""}`}
+                                              tabIndex="-1"
+                                              aria-hidden={!certDeleteTarget}
+                                              aria-modal={certDeleteTarget ? true : undefined}
+                                              role={certDeleteTarget ? "dialog" : undefined}
+                                              aria-labelledby="escDeleteCertTitle"
+                                              onClick={(event) => {
+                                                if (event.target === event.currentTarget) closeDeleteCertification();
+                                              }}
+                                            >
+                                              <div className="modal-dialog modal-dialog-centered">
+                                                <div className="modal-content esc-modal">
+                                                  <div className="modal-header esc-modal-header">
+                                                    <div>
+                                                      <span className="esc-modal-label">Certifications</span>
+                                                      <h5 className="modal-title" id="escDeleteCertTitle">Delete Certification</h5>
+                                                    </div>
+                                                    <button type="button" className="btn-close" aria-label="Close" onClick={closeDeleteCertification} disabled={certDeleteSubmitting}></button>
+                                                  </div>
+                                                  <div className="modal-body">
+                                                    <p className="mb-0">Delete <strong>{certDeleteTarget?.certification_name}</strong>? This cannot be undone.</p>
+                                                    {certDeleteError && <p className="text-danger mt-3 mb-0" role="alert">{certDeleteError}</p>}
+                                                  </div>
+                                                  <div className="modal-footer esc-modal-footer">
+                                                    <button type="button" className="btn esc-cancel-btn" onClick={closeDeleteCertification} disabled={certDeleteSubmitting}>Cancel</button>
+                                                    <button type="button" className="btn btn-danger" onClick={deleteCertification} disabled={certDeleteSubmitting}>
+                                                      <i className={`bi ${certDeleteSubmitting ? "bi-arrow-repeat" : "bi-trash"}`}></i>
+                                                      {certDeleteSubmitting ? "Deleting..." : "Delete Certification"}
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="toast-container position-fixed bottom-0 end-0 p-3">
                         <div
                             id="escToast"
                             className="toast esc-toast"

@@ -1,6 +1,32 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import CharacterOnlyInput from "../utils/CharacterOnlyInput";
+import IntegerOnlyInput from "../utils/IntegerOnlyInput";
 
 const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+const EMPLOYEE_SHORTCUTS = [
+    { id: "dashboard", label: "Employee Dashboard", description: "Your workspace overview", icon: "bi-grid", color: "blue" },
+    { id: "apply-leave", label: "Apply Leave", description: "Request time off", icon: "bi-calendar-plus", color: "purple" },
+    { id: "attendance", label: "Attendance", description: "View attendance", icon: "bi-calendar-check", color: "blue" },
+    { id: "new-request", label: "New Request", description: "Contact HR / Admin", icon: "bi-send", color: "orange" },
+    { id: "documents", label: "Documents", description: "My documents", icon: "bi-folder2-open", color: "green" },
+    { id: "employment-details", label: "Employment Details", description: "View your job information", icon: "bi-briefcase", color: "orange" },
+    { id: "skills-certifications", label: "Skills & Certifications", description: "Manage your qualifications", icon: "bi-award", color: "green" },
+    { id: "assets", label: "My Assets", description: "Assigned equipment", icon: "bi-laptop", color: "pink" },
+    { id: "profile", label: "My Profile", description: "View profile", icon: "bi-person", color: "dark" },
+    
+    { id: "calendar", label: "Calendar", description: "View company events", icon: "bi-calendar-date", color: "blue" },
+    { id: "notifications", label: "Notifications", description: "View your updates", icon: "bi-bell", color: "pink" },
+    { id: "settings", label: "Settings", description: "Manage your preferences", icon: "bi-gear", color: "dark" },
+    { id: "exit-management", label: "Resignation & Exit", description: "View exit information", icon: "bi-box-arrow-right", color: "orange" },
+];
+
+const getLatestEligibleDateOfBirth = () => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 18);
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${date.getFullYear()}-${month}-${day}`;
+};
 
 export default function Settings({ currentUser, employeeProfile }) {
     const firstName = employeeProfile?.first_name || "";
@@ -9,15 +35,14 @@ export default function Settings({ currentUser, employeeProfile }) {
     const employeeInitials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
         || currentUser?.email?.slice(0, 2).toUpperCase()
         || "EM";
-    const avatarUrl = employeeProfile?.avatar_url;
-    const employeeAvatar = avatarUrl
-        ? (/^https?:\/\//i.test(avatarUrl) ? avatarUrl : `${API_BASE}/${avatarUrl.replace(/^\/+/, "")}`)
-        : "";
     const profileCompletion = Math.min(100, Math.max(0, Number(employeeProfile?.profile_completion_percentage) || 0));
     const employeeStatus = employeeProfile?.status || "Status unavailable";
     const [personalInfo, setPersonalInfo] = useState(null);
     const [personalInfoLoading, setPersonalInfoLoading] = useState(true);
     const [personalInfoError, setPersonalInfoError] = useState("");
+    const [profilePictureUploading, setProfilePictureUploading] = useState(false);
+    const [profilePictureError, setProfilePictureError] = useState("");
+    const profilePictureInputRef = useRef(null);
     const [isPersonalEditOpen, setIsPersonalEditOpen] = useState(false);
     const [personalEditFeedback, setPersonalEditFeedback] = useState("");
     const [personalEditSubmitting, setPersonalEditSubmitting] = useState(false);
@@ -92,6 +117,7 @@ export default function Settings({ currentUser, employeeProfile }) {
         panNumber: "",
         passportNumber: "",
         drivingLicenseNumber: "",
+        uanNumber: "",
         reason: "",
     });
     const [emergencyContact, setEmergencyContact] = useState(null);
@@ -110,6 +136,40 @@ export default function Settings({ currentUser, employeeProfile }) {
         secondPhoneNumber: "",
         secondAddress: "",
     });
+    const [selectedShortcutIds, setSelectedShortcutIds] = useState([]);
+    const [shortcutSelectionsLoading, setShortcutSelectionsLoading] = useState(true);
+    const [shortcutSelectionsSaving, setShortcutSelectionsSaving] = useState(false);
+    const [shortcutSelectionError, setShortcutSelectionError] = useState("");
+
+    useEffect(() => {
+        if (!currentUser?.id) {
+            setSelectedShortcutIds([]);
+            setShortcutSelectionsLoading(false);
+            setShortcutSelectionError("Unable to identify the current employee.");
+            return;
+        }
+
+        setShortcutSelectionsLoading(true);
+        setShortcutSelectionError("");
+        const loadShortcutSelections = async () => {
+            try {
+                const response = await fetch(
+                    `${API_BASE}/api/employee/shortcut-selections/${currentUser.id}`
+                );
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || "Unable to load shortcut selections.");
+                }
+                setSelectedShortcutIds(data.shortcutIds || []);
+            } catch (error) {
+                setShortcutSelectionError(error.message || "Unable to load shortcut selections.");
+            } finally {
+                setShortcutSelectionsLoading(false);
+            }
+        };
+
+        loadShortcutSelections();
+    }, [currentUser?.id]);
 
     useEffect(() => {
         if (!currentUser?.id) {
@@ -274,6 +334,85 @@ export default function Settings({ currentUser, employeeProfile }) {
     }, [currentUser?.id]);
 
     const displayValue = (value) => value || "—";
+    const avatarUrl = personalInfo?.profile_pic || employeeProfile?.avatar_url || "";
+    const employeeAvatar = avatarUrl
+        ? (/^https?:\/\//i.test(avatarUrl) ? avatarUrl : `${API_BASE}/${avatarUrl.replace(/^\/+/, "")}`)
+        : "";
+    const uploadProfilePicture = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        if (!currentUser?.id) {
+            setProfilePictureError("Unable to identify the current employee.");
+            return;
+        }
+        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+            setProfilePictureError("Choose a JPEG, PNG, or WebP image.");
+            event.target.value = "";
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            setProfilePictureError("Profile picture must be 5 MB or smaller.");
+            event.target.value = "";
+            return;
+        }
+
+        setProfilePictureUploading(true);
+        setProfilePictureError("");
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            const response = await fetch(
+                `${API_BASE}/api/employee/personal-info/${currentUser.id}/profile-pic`,
+                { method: "POST", body: formData }
+            );
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || "Unable to upload profile picture.");
+            }
+            setPersonalInfo((current) => ({ ...(current || {}), profile_pic: data.profilePic }));
+        } catch (error) {
+            setProfilePictureError(error.message || "Unable to upload profile picture.");
+        } finally {
+            setProfilePictureUploading(false);
+            event.target.value = "";
+        }
+    };
+    const toggleShortcutSelection = async (shortcutId) => {
+        if (shortcutSelectionsLoading || shortcutSelectionsSaving) return;
+
+        const previousShortcutIds = selectedShortcutIds;
+        const nextShortcutIds = previousShortcutIds.includes(shortcutId)
+            ? previousShortcutIds.filter((id) => id !== shortcutId)
+            : [...previousShortcutIds, shortcutId];
+        if (nextShortcutIds.length > 6) {
+            setShortcutSelectionError("Select up to 6 shortcuts.");
+            return;
+        }
+
+        setSelectedShortcutIds(nextShortcutIds);
+        setShortcutSelectionsSaving(true);
+        setShortcutSelectionError("");
+        try {
+            const response = await fetch(
+                `${API_BASE}/api/employee/shortcut-selections/${currentUser.id}`,
+                {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ shortcutIds: nextShortcutIds }),
+                }
+            );
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || "Unable to save shortcut selections.");
+            }
+            setSelectedShortcutIds(data.shortcutIds || []);
+        } catch (error) {
+            setSelectedShortcutIds(previousShortcutIds);
+            setShortcutSelectionError(error.message || "Unable to save shortcut selections.");
+        } finally {
+            setShortcutSelectionsSaving(false);
+        }
+    };
     const formatAddress = (...parts) => parts.filter(Boolean).join(", ") || "—";
     const emergencyContacts = Array.isArray(emergencyContact)
         ? emergencyContact
@@ -368,12 +507,20 @@ export default function Settings({ currentUser, employeeProfile }) {
     };
     const updatePersonalEditField = (event) => {
         const { name, value } = event.target;
-        setPersonalEditForm((current) => ({ ...current, [name]: value }));
+        const characterOnlyFields = ["firstName", "middleName", "lastName"];
+        const nextValue = characterOnlyFields.includes(name)
+            ? CharacterOnlyInput.sanitize(value)
+            : value;
+        setPersonalEditForm((current) => ({ ...current, [name]: nextValue }));
     };
     const submitPersonalEditRequest = async (event) => {
         event.preventDefault();
         if (!currentUser?.id) {
             setPersonalEditFeedback("Unable to identify the current employee.");
+            return;
+        }
+        if (personalEditForm.dateOfBirth && personalEditForm.dateOfBirth > getLatestEligibleDateOfBirth()) {
+            setPersonalEditFeedback("Employees must be at least 18 years old.");
             return;
         }
 
@@ -452,6 +599,11 @@ export default function Settings({ currentUser, employeeProfile }) {
     };
     const updateContactEditField = (event) => {
         const { name, value, checked, type } = event.target;
+        const integerOnlyFields = ["mobile", "alternatePhone", "currentPostalCode"];
+        const nextValue = integerOnlyFields.includes(name)
+            ? IntegerOnlyInput.sanitize(value)
+            : value;
+
         setContactEditForm((current) => {
             if (name === "sameAsCurrentAddress") {
                 return {
@@ -467,16 +619,58 @@ export default function Settings({ currentUser, employeeProfile }) {
                 };
             }
 
-            const next = { ...current, [name]: type === "checkbox" ? checked : value };
+            const next = { ...current, [name]: type === "checkbox" ? checked : nextValue };
             if (current.sameAsCurrentAddress && name.startsWith("current")) {
                 const permanentField = name.replace("current", "permanent");
-                next[permanentField] = value;
+                next[permanentField] = nextValue;
             }
             return next;
         });
     };
     const submitContactEdit = async (event) => {
         event.preventDefault();
+        const requiredFields = [
+            ["Personal Email", contactEditForm.personalEmail],
+            ["Mobile Number", contactEditForm.mobile],
+            ["Alternate Phone", contactEditForm.alternatePhone],
+            ["Current Address", contactEditForm.currentAddress],
+            ["Current City", contactEditForm.currentCity],
+            ["Current State", contactEditForm.currentState],
+            ["Current Postal Code", contactEditForm.currentPostalCode],
+        ];
+
+        if (!contactEditForm.sameAsCurrentAddress) {
+            requiredFields.push(
+                ["Permanent Address", contactEditForm.permanentAddress],
+                ["Permanent City", contactEditForm.permanentCity],
+                ["Permanent State", contactEditForm.permanentState],
+                ["Permanent Postal Code", contactEditForm.permanentPostalCode],
+                ["Permanent Country", contactEditForm.permanentCountry]
+            );
+        }
+
+        const missingFields = requiredFields
+            .filter(([, value]) => !String(value ?? "").trim())
+            .map(([label]) => label);
+
+        if (missingFields.length) {
+            setContactEditFeedback(`Please fill in: ${missingFields.join(", ")}.`);
+            return;
+        }
+
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const invalidEmails = [
+            ["Work Email", contactEditForm.workEmail],
+            ["Personal Email", contactEditForm.personalEmail],
+        ]
+            .filter(([, email]) => !emailPattern.test(email.trim()))
+            .map(([label]) => label);
+
+        if (invalidEmails.length) {
+            setContactEditFeedback(`Enter a valid ${invalidEmails.join(" and ")}.`);
+            return;
+        }
+
         if (!currentUser?.id) {
             setContactEditFeedback("Unable to identify the current employee.");
             return;
@@ -552,6 +746,25 @@ export default function Settings({ currentUser, employeeProfile }) {
     };
     const submitBankEdit = async (event) => {
         event.preventDefault();
+        const requiredFields = [
+            ["Bank Name", bankEditForm.bankName],
+            ["Account Holder Name", bankEditForm.accountHolderName],
+            ["Account Number", bankEditForm.accountNumber],
+            ["Confirm Account Number", bankEditForm.confirmAccountNumber],
+            ["IFSC Code", bankEditForm.ifscCode],
+            ["Branch Name", bankEditForm.branchName],
+            ["Account Type", bankEditForm.accountType],
+            ["Reason for Change", bankEditForm.reason],
+        ];
+        const missingFields = requiredFields
+            .filter(([, value]) => !String(value ?? "").trim())
+            .map(([label]) => label);
+
+        if (missingFields.length) {
+            setBankEditFeedback(`Please fill in: ${missingFields.join(", ")}.`);
+            return;
+        }
+
         if (!currentUser?.id) {
             setBankEditFeedback("Unable to identify the current employee.");
             return;
@@ -602,6 +815,7 @@ export default function Settings({ currentUser, employeeProfile }) {
             panNumber: identityInfo?.pan_number_masked || "",
             passportNumber: identityInfo?.passport_number_masked || "",
             drivingLicenseNumber: identityInfo?.driving_license_masked || "",
+            uanNumber: "",
             reason: identityInfo?.change_reason || "",
         });
         setIdentityEditTouched({});
@@ -610,7 +824,8 @@ export default function Settings({ currentUser, employeeProfile }) {
     };
     const updateIdentityEditField = (event) => {
         const { name, value } = event.target;
-        setIdentityEditForm((current) => ({ ...current, [name]: value }));
+        const nextValue = name === "uanNumber" ? IntegerOnlyInput.sanitize(value) : value;
+        setIdentityEditForm((current) => ({ ...current, [name]: nextValue }));
         setIdentityEditTouched((current) => ({ ...current, [name]: true }));
     };
     const focusIdentityNumberField = (event) => {
@@ -622,6 +837,22 @@ export default function Settings({ currentUser, employeeProfile }) {
     };
     const submitIdentityEdit = async (event) => {
         event.preventDefault();
+        const aadhaarNumber = identityEditTouched.aadhaarNumber
+            ? identityEditForm.aadhaarNumber.replace(/\D/g, "")
+            : "";
+        const panNumber = identityEditTouched.panNumber
+            ? identityEditForm.panNumber.trim().toUpperCase()
+            : "";
+        const missingFields = [
+            !aadhaarNumber && "Aadhaar Number",
+            !panNumber && "PAN Number",
+        ].filter(Boolean);
+
+        if (missingFields.length) {
+            setIdentityEditFeedback(`Please enter ${missingFields.join(" and ")}.`);
+            return;
+        }
+
         if (!currentUser?.id) {
             setIdentityEditFeedback("Unable to identify the current employee.");
             return;
@@ -636,10 +867,11 @@ export default function Settings({ currentUser, employeeProfile }) {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        aadhaarNumber: identityEditTouched.aadhaarNumber ? identityEditForm.aadhaarNumber.replace(/\D/g, "") : "",
-                        panNumber: identityEditTouched.panNumber ? identityEditForm.panNumber : "",
+                        aadhaarNumber,
+                        panNumber,
                         passportNumber: identityEditTouched.passportNumber ? identityEditForm.passportNumber : "",
                         drivingLicenseNumber: identityEditTouched.drivingLicenseNumber ? identityEditForm.drivingLicenseNumber : "",
+                        uanNumber: identityEditTouched.uanNumber ? identityEditForm.uanNumber : "",
                         reason: identityEditForm.reason,
                     }),
                 }
@@ -730,8 +962,21 @@ export default function Settings({ currentUser, employeeProfile }) {
             {employeeAvatar
                 ? <img src={employeeAvatar} alt={`${employeeName} profile`} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "23px" }} />
                 : <span>{employeeInitials}</span>}
-            <button type="button" title="Change profile photo">
-                <i className="bi bi-camera-fill"></i>
+            <input
+                ref={profilePictureInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="d-none"
+                onChange={uploadProfilePicture}
+            />
+            <button
+                type="button"
+                title={profilePictureUploading ? "Uploading profile photo" : "Change profile photo"}
+                aria-label={profilePictureUploading ? "Uploading profile photo" : "Change profile photo"}
+                disabled={profilePictureUploading}
+                onClick={() => profilePictureInputRef.current?.click()}
+            >
+                <i className={`bi ${profilePictureUploading ? "bi-arrow-repeat" : "bi-camera-fill"}`}></i>
             </button>
         </div>
         <div className="es-profile-info">
@@ -743,6 +988,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                 <span><i className="bi bi-geo-alt"></i> {employeeProfile?.city || employeeProfile?.location || "Location not set"}</span>
                 <span className={employeeStatus.toLowerCase() === "active" ? "es-active-tag" : ""}><i className="bi bi-check-circle-fill"></i> {employeeStatus}</span>
             </div>
+            {profilePictureError && <p className="text-danger mb-0" role="alert">{profilePictureError}</p>}
         </div>
         <div className="es-profile-completion">
             <div className="es-completion-top">
@@ -1048,8 +1294,6 @@ export default function Settings({ currentUser, employeeProfile }) {
                     <div className="es-info-item"><span>Contact Name</span><strong>{displayValue(primaryEmergencyContact?.contact_name)}</strong></div>
                     <div className="es-info-item"><span>Relationship</span><strong>{displayValue(primaryEmergencyContact?.relationship)}</strong></div>
                     <div className="es-info-item"><span>Phone Number</span><strong>{displayValue(primaryEmergencyContact?.phone_number)}</strong></div>
-                    <div className="es-info-item"><span>Alternate Phone</span><strong>{displayValue(primaryEmergencyContact?.alternate_phone)}</strong></div>
-                    <div className="es-info-item"><span>Email</span><strong>—</strong></div>
                     <div className="es-info-item"><span>Address</span><strong>{displayValue(primaryEmergencyContact?.address)}</strong></div>
                 </div>
                 {emergencyContactLoading && <p role="status">Loading emergency contact...</p>}
@@ -1192,198 +1436,53 @@ export default function Settings({ currentUser, employeeProfile }) {
                             <p>Personalize your employee dashboard shortcuts</p>
                         </div>
                     </div>
-                    <button className="btn es-edit-btn">
-                        <i className="bi bi-check2"></i> Save Preferences
-                    </button>
+                    
                 </div>
 
                 <div className="row g-3">
-
-                    <div className="col-xl-3 col-lg-3 col-md-4 col-6">
-                        <button className="ed-quick-card">
-                            <div className="d-flex justify-content-between">
-                                <span className="ed-quick-icon ed-q-purple">
-                                    <i className="bi bi-calendar-plus"></i>
-                                </span>
-                                <span>
-                                    <i className="bi bi-star-fill text-warning"></i>
-                                </span>
+                    {EMPLOYEE_SHORTCUTS.map((shortcut) => {
+                        const isSelected = selectedShortcutIds.includes(shortcut.id);
+                        return (
+                            <div className="col-xl-3 col-lg-3 col-md-4 col-6" key={shortcut.id}>
+                                <button
+                                    type="button"
+                                    className="ed-quick-card"
+                                    aria-pressed={isSelected}
+                                    disabled={shortcutSelectionsLoading || shortcutSelectionsSaving || !currentUser?.id}
+                                    onClick={() => toggleShortcutSelection(shortcut.id)}
+                                >
+                                    <div className="d-flex justify-content-between">
+                                        <span className={`ed-quick-icon ed-q-${shortcut.color}`}>
+                                            <i className={`bi ${shortcut.icon}`}></i>
+                                        </span>
+                                        <span aria-hidden="true">
+                                            <i
+                                                className={`bi ${isSelected ? "bi-star-fill" : "bi-star"}`}
+                                                style={isSelected ? { color: "#f08a24" } : undefined}
+                                            ></i>
+                                        </span>
+                                    </div>
+                                    <strong>{shortcut.label}</strong>
+                                    <small>{shortcut.description}</small>
+                                </button>
                             </div>
-                            <strong>Apply Leave</strong>
-                            <small>Request time off</small>
-                        </button>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-4 col-6">
-                        <button className="ed-quick-card">
-                            <div className="d-flex justify-content-between">
-                                <span className="ed-quick-icon ed-q-blue">
-                                    <i className="bi bi-calendar-check"></i>
-                                </span>
-                                <span>
-                                    <i className="bi bi-star-fill text-warning"></i>
-                                </span>
-                            </div>
-                            <strong>Attendance</strong>
-                            <small>View attendance</small>
-                        </button>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-4 col-6">
-                        <button className="ed-quick-card">
-                            <div className="d-flex justify-content-between">
-                                <span className="ed-quick-icon ed-q-orange">
-                                    <i className="bi bi-send"></i>
-                                </span>
-                                <span>
-                                    <i className="bi bi-star"></i>
-                                </span>
-                            </div>
-                            <strong>New Request</strong>
-                            <small>Contact HR / Admin</small>
-                        </button>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-4 col-6">
-                        <button className="ed-quick-card">
-                            <div className="d-flex justify-content-between">
-                                <span className="ed-quick-icon ed-q-green">
-                                    <i className="bi bi-folder2-open"></i>
-                                </span>
-                                <span>
-                                    <i className="bi bi-star"></i>
-                                </span>
-                            </div>
-                            <strong>Documents</strong>
-                            <small>My documents</small>
-                        </button>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-4 col-6">
-                        <button className="ed-quick-card">
-                            <div className="d-flex justify-content-between">
-                                <span className="ed-quick-icon ed-q-pink">
-                                    <i className="bi bi-laptop"></i>
-                                </span>
-                                <span>
-                                    <i className="bi bi-star"></i>
-                                </span>
-                            </div>
-                            <strong>My Assets</strong>
-                            <small>Assigned equipment</small>
-                        </button>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-4 col-6">
-                        <button className="ed-quick-card">
-                            <div className="d-flex justify-content-between">
-                                <span className="ed-quick-icon ed-q-dark">
-                                    <i className="bi bi-person"></i>
-                                </span>
-                                <span>
-                                    <i className="bi bi-star-fill text-warning"></i>
-                                </span>
-                            </div>
-                            <strong>My Profile</strong>
-                            <small>View profile</small>
-                        </button>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-4 col-6">
-                        <button className="ed-quick-card">
-                            <div className="d-flex justify-content-between">
-                                <span className="ed-quick-icon ed-q-purple">
-                                    <i className="bi bi-calendar-plus"></i>
-                                </span>
-                                <span>
-                                    <i className="bi bi-star-fill text-warning"></i>
-                                </span>
-                            </div>
-                            <strong>Apply Leave</strong>
-                            <small>Request time off</small>
-                        </button>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-4 col-6">
-                        <button className="ed-quick-card">
-                            <div className="d-flex justify-content-between">
-                                <span className="ed-quick-icon ed-q-blue">
-                                    <i className="bi bi-calendar-check"></i>
-                                </span>
-                                <span>
-                                    <i className="bi bi-star"></i>
-                                </span>
-                            </div>
-                            <strong>Attendance</strong>
-                            <small>View attendance</small>
-                        </button>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-4 col-6">
-                        <button className="ed-quick-card">
-                            <div className="d-flex justify-content-between">
-                                <span className="ed-quick-icon ed-q-orange">
-                                    <i className="bi bi-send"></i>
-                                </span>
-                                <span>
-                                    <i className="bi bi-star"></i>
-                                </span>
-                            </div>
-                            <strong>New Request</strong>
-                            <small>Contact HR / Admin</small>
-                        </button>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-4 col-6">
-                        <button className="ed-quick-card">
-                            <div className="d-flex justify-content-between">
-                                <span className="ed-quick-icon ed-q-green">
-                                    <i className="bi bi-folder2-open"></i>
-                                </span>
-                                <span>
-                                    <i className="bi bi-star"></i>
-                                </span>
-                            </div>
-                            <strong>Documents</strong>
-                            <small>My documents</small>
-                        </button>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-4 col-6">
-                        <button className="ed-quick-card">
-                            <div className="d-flex justify-content-between">
-                                <span className="ed-quick-icon ed-q-pink">
-                                    <i className="bi bi-laptop"></i>
-                                </span>
-                                <span>
-                                    <i className="bi bi-star-fill text-warning"></i>
-                                </span>
-                            </div>
-                            <strong>My Assets</strong>
-                            <small>Assigned equipment</small>
-                        </button>
-                    </div>
-
-                    <div className="col-xl-3 col-lg-3 col-md-4 col-6">
-                        <button className="ed-quick-card">
-                            <div className="d-flex justify-content-between">
-                                <span className="ed-quick-icon ed-q-dark">
-                                    <i className="bi bi-person"></i>
-                                </span>
-                                <span>
-                                    <i className="bi bi-star-fill text-warning"></i>
-                                </span>
-                            </div>
-                            <strong>My Profile</strong>
-                            <small>View profile</small>
-                        </button>
-                    </div>
-
+                        );
+                    })}
                 </div>
 
-                <div className="mt-4">
-                    <i className="bi bi-info-circle"></i>
-                    <strong>Note:</strong> Select up to 6 shortcuts as favourites for quick access.
+                <div className="mt-4" role={shortcutSelectionError ? "alert" : "status"}>
+                    {shortcutSelectionError ? (
+                        <span className="text-danger">{shortcutSelectionError}</span>
+                    ) : shortcutSelectionsLoading ? (
+                        <span>Loading saved shortcuts...</span>
+                    ) : shortcutSelectionsSaving ? (
+                        <span>Saving shortcut selections...</span>
+                    ) : (
+                        <>
+                            <i className="bi bi-info-circle"></i>
+                            <strong> Note:</strong> Select up to 6 shortcuts as favourites for quick access.
+                        </>
+                    )}
                 </div>
             </section>
 
@@ -1444,7 +1543,8 @@ export default function Settings({ currentUser, employeeProfile }) {
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="personalEditDateOfBirth">Date of Birth</label>
-                        <input id="personalEditDateOfBirth" type="date" className="form-control" name="dateOfBirth" value={personalEditForm.dateOfBirth} onChange={updatePersonalEditField} />
+                        <input id="personalEditDateOfBirth" type="date" className="form-control" name="dateOfBirth" value={personalEditForm.dateOfBirth} max={getLatestEligibleDateOfBirth()} onChange={updatePersonalEditField} />
+                        <small className="text-muted">Employees must be at least 18 years old.</small>
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="personalEditGender">Gender</label>
@@ -1492,9 +1592,9 @@ export default function Settings({ currentUser, employeeProfile }) {
             </div>
             <div className="modal-footer">
                 <button type="button" className="btn es-btn-light" onClick={() => setIsPersonalEditOpen(false)}>Cancel</button>
-                <button type="submit" className="btn es-btn-primary" >
-                    <i className={`bi ${personalEditSubmitting ? "bi-arrow-repeat" : "bi-check-lg"}`}></i>
-                    {personalEditSubmitting ? "Saving..." : "Save Changes"}
+                <button type="submit" className="btn es-btn-primary">
+                    <i className={`bi ${personalEditSubmitting ? "bi-arrow-repeat" : "bi-send"}`}></i>
+                    {personalEditSubmitting ? "Submitting..." : "Submit Update Request"}
                 </button>
             </div>
             {personalEditFeedback && <p className="px-4 pb-3 mb-0 text-muted" role="status">{personalEditFeedback}</p>}
@@ -1559,7 +1659,7 @@ export default function Settings({ currentUser, employeeProfile }) {
     }}
 >
     <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
-        <form className="modal-content es-modal-content" onSubmit={submitBankEdit}>
+        <form className="modal-content es-modal-content" onSubmit={submitBankEdit} noValidate>
             <div className="modal-header">
                 <div>
                     <h5 className="modal-title">Request Bank Details Update</h5>
@@ -1571,23 +1671,23 @@ export default function Settings({ currentUser, employeeProfile }) {
                 <div className="row g-3">
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="bankEditName">Bank Name</label>
-                        <input id="bankEditName" className="form-control" name="bankName" value={bankEditForm.bankName} onChange={updateBankEditField} maxLength="150" required />
+                        <input id="bankEditName" className="form-control" name="bankName" value={bankEditForm.bankName} onChange={updateBankEditField} maxLength="150" />
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="bankEditHolder">Account Holder Name</label>
-                        <input id="bankEditHolder" className="form-control" name="accountHolderName" value={bankEditForm.accountHolderName} onChange={updateBankEditField} maxLength="150" required />
+                        <input id="bankEditHolder" className="form-control" name="accountHolderName" value={bankEditForm.accountHolderName} onChange={updateBankEditField} maxLength="150" />
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="bankEditAccount">Account Number</label>
-                        <input id="bankEditAccount" type="text" inputMode="numeric" autoComplete="off" className="form-control" name="accountNumber" value={bankEditForm.accountNumber} onChange={updateBankEditField} maxLength="50" placeholder="Enter account number" required />
+                        <input id="bankEditAccount" type="password" inputMode="numeric" autoComplete="off" className="form-control" name="accountNumber" value={bankEditForm.accountNumber} onChange={updateBankEditField} maxLength="16" placeholder="Enter account number" />
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="bankEditConfirmAccount">Confirm Account Number</label>
-                        <input id="bankEditConfirmAccount" type="text" inputMode="numeric" autoComplete="off" className="form-control" name="confirmAccountNumber" value={bankEditForm.confirmAccountNumber} onChange={updateBankEditField} maxLength="50" placeholder="Enter confirm account number" required />
+                        <input id="bankEditConfirmAccount" type="text" inputMode="numeric" autoComplete="off" className="form-control" name="confirmAccountNumber" value={bankEditForm.confirmAccountNumber} onChange={updateBankEditField} maxLength="16" placeholder="Enter confirm account number" />
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="bankEditIfsc">IFSC Code</label>
-                        <input id="bankEditIfsc" className="form-control" name="ifscCode" value={bankEditForm.ifscCode} onChange={updateBankEditField} maxLength="20" placeholder="Enter IFSC code" required />
+                        <input id="bankEditIfsc" className="form-control" name="ifscCode" value={bankEditForm.ifscCode} onChange={updateBankEditField} maxLength="20" placeholder="Enter IFSC code" />
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="bankEditBranch">Branch Name</label>
@@ -1595,7 +1695,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="bankEditType">Account Type</label>
-                        <select id="bankEditType" className="form-select" name="accountType" value={bankEditForm.accountType} onChange={updateBankEditField} required>
+                        <select id="bankEditType" className="form-select" name="accountType" value={bankEditForm.accountType} onChange={updateBankEditField}>
                             <option value="Salary / Savings">Salary / Savings</option>
                             <option value="Savings">Savings</option>
                             <option value="Current">Current</option>
@@ -1603,7 +1703,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="bankEditReason">Reason for Change</label>
-                        <textarea id="bankEditReason" className="form-control" name="reason" value={bankEditForm.reason} onChange={updateBankEditField} rows="3" maxLength="2000" placeholder="Enter reason for change" required></textarea>
+                        <textarea id="bankEditReason" className="form-control" name="reason" value={bankEditForm.reason} onChange={updateBankEditField} rows="3" maxLength="2000" placeholder="Enter reason for change"></textarea>
                     </div>
                 </div>
                 <div className="es-security-note mt-3">
@@ -1635,7 +1735,7 @@ export default function Settings({ currentUser, employeeProfile }) {
     }}
 >
     <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
-        <form className="modal-content es-modal-content" onSubmit={submitContactEdit}>
+        <form className="modal-content es-modal-content" onSubmit={submitContactEdit} noValidate>
             <div className="modal-header">
                 <div>
                     <h5 className="modal-title">Update Contact Information</h5>
@@ -1645,21 +1745,21 @@ export default function Settings({ currentUser, employeeProfile }) {
             </div>
             <div className="modal-body">
                 <div className="row g-3">
-                    <div className="col-12 col-md-6 es-edit-field">
+                    {/* <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="contactEditWorkEmail">Work Email</label>
-                        <input id="contactEditWorkEmail" type="email" className="form-control" name="workEmail" value={contactEditForm.workEmail} onChange={updateContactEditField} required />
-                    </div>
+                        <input id="contactEditWorkEmail" type="email" className="form-control" name="workEmail" value={contactEditForm.workEmail} onChange={updateContactEditField} />
+                    </div> */}
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="contactEditPersonalEmail">Personal Email</label>
                         <input id="contactEditPersonalEmail" type="email" className="form-control" name="personalEmail" value={contactEditForm.personalEmail} onChange={updateContactEditField} placeholder="Enter personal email" />
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="contactEditMobile">Mobile Number</label>
-                        <input id="contactEditMobile" type="tel" className="form-control" name="mobile" value={contactEditForm.mobile} onChange={updateContactEditField} placeholder="Enter mobile number" />
+                        <input id="contactEditMobile" type="tel" inputMode="numeric" className="form-control" name="mobile" value={contactEditForm.mobile} onChange={updateContactEditField} placeholder="Enter mobile number" maxlength="10" />
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="contactEditAlternatePhone">Alternate Phone</label>
-                        <input id="contactEditAlternatePhone" type="tel" className="form-control" name="alternatePhone" value={contactEditForm.alternatePhone} onChange={updateContactEditField} placeholder="Enter alternate phone" />
+                        <input id="contactEditAlternatePhone" type="tel" inputMode="numeric" className="form-control" name="alternatePhone" value={contactEditForm.alternatePhone} onChange={updateContactEditField} placeholder="Enter alternate phone" maxlength="10" />
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="contactEditCurrentAddress">Current Address</label>
@@ -1675,12 +1775,12 @@ export default function Settings({ currentUser, employeeProfile }) {
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="contactEditCurrentPostalCode">Current Postal Code</label>
-                        <input id="contactEditCurrentPostalCode" className="form-control" name="currentPostalCode" value={contactEditForm.currentPostalCode} onChange={updateContactEditField} placeholder="Enter current postal code" />
+                        <input id="contactEditCurrentPostalCode" inputMode="numeric" className="form-control" name="currentPostalCode" value={contactEditForm.currentPostalCode} onChange={updateContactEditField} placeholder="Enter current postal code" maxlength="6" />
                     </div>
-                    <div className="col-12 col-md-6 es-edit-field">
+                    {/* <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="contactEditCurrentCountry">Current Country</label>
                         <input id="contactEditCurrentCountry" className="form-control" name="currentCountry" value={contactEditForm.currentCountry} onChange={updateContactEditField} placeholder="Enter current country" />
-                    </div>
+                    </div> */}
                     <div className="col-12 es-edit-field es-edit-checkbox-field">
                         <div className="form-check">
                             <input id="contactEditSameAddress" type="checkbox" className="form-check-input" name="sameAsCurrentAddress" checked={contactEditForm.sameAsCurrentAddress} onChange={updateContactEditField} />
@@ -1738,7 +1838,7 @@ export default function Settings({ currentUser, employeeProfile }) {
     }}
 >
     <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
-        <form className="modal-content es-modal-content" onSubmit={submitIdentityEdit}>
+        <form className="modal-content es-modal-content" onSubmit={submitIdentityEdit} noValidate>
             <div className="modal-header">
                 <div>
                     <h5 className="modal-title">Request Identity Information Update</h5>
@@ -1765,13 +1865,17 @@ export default function Settings({ currentUser, employeeProfile }) {
                         <input id="identityEditDrivingLicense" className="form-control" name="drivingLicenseNumber" value={identityEditForm.drivingLicenseNumber} onFocus={focusIdentityNumberField} onChange={updateIdentityEditField} maxLength="30" placeholder="Enter driving license number" />
                     </div>
                     <div className="col-12 col-md-6 es-edit-field">
+                        <label htmlFor="identityEditUan">UAN Number</label>
+                        <input id="identityEditUan" type="text" inputMode="numeric" className="form-control" name="uanNumber" value={identityEditForm.uanNumber} onFocus={focusIdentityNumberField} onChange={updateIdentityEditField} maxLength="12" placeholder="Enter UAN number" />
+                    </div>
+                    <div className="col-12 col-md-6 es-edit-field">
                         <label htmlFor="identityEditReason">Reason for Change</label>
-                        <textarea id="identityEditReason" className="form-control" name="reason" value={identityEditForm.reason} onChange={updateIdentityEditField} rows="3" maxLength="2000" placeholder="Enter reason for change" required></textarea>
+                        <textarea id="identityEditReason" className="form-control" name="reason" value={identityEditForm.reason} onChange={updateIdentityEditField} rows="3" maxLength="2000" placeholder="Enter reason for change"></textarea>
                     </div>
                 </div>
                 <div className="es-security-note mt-3">
                     <i className="bi bi-shield-lock"></i>
-                    <span>Existing identity numbers are masked. Focus a number field to replace it. Changes require HR verification.</span>
+                    <span>Aadhaar and PAN are required. Passport, Driving License, UAN, and reason are optional. Focus a masked number to replace it.</span>
                 </div>
                 {identityEditFeedback && <p className="text-danger mt-3 mb-0" role="alert">{identityEditFeedback}</p>}
             </div>
