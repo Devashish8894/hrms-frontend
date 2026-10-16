@@ -24698,8 +24698,7 @@ a:visited {
     border-radius: inherit;
     background: #3c2fbc;
 }
-}
-@media (max-width: 575.98px) {
+    @media (max-width: 575.98px) {
     .esc-skill-details-dialog {
         width: calc(100vw - 24px);
         margin: 12px auto;
@@ -24712,3 +24711,5 @@ a:visited {
         padding: 12px;
     }
 }
+}
+
