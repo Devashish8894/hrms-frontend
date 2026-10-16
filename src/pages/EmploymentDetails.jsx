@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-export default function EmploymentDetails({ employeeProfile, currentUser, onProfileUpdate }) {
+export default function EmploymentDetails({ employeeProfile, currentUser, onProfileUpdate, embedded = false }) {
   const [profile, setProfile] = useState(employeeProfile || {});
   const [workMode, setWorkMode] = useState(employeeProfile?.work_mode || 'Hybrid');
   const [updating, setUpdating] = useState(false);
@@ -289,41 +289,43 @@ export default function EmploymentDetails({ employeeProfile, currentUser, onProf
           <div className="px-0 px-md-5 employee-dashboard">
             <div className="employment-details-page">
 
-              {/* Header */}
-              <div className="employment-page-intro">
-                <div>
-                  <h1>Employment Details</h1>
-                  <p>Employment profile and organizational details for this employee.</p>
-                </div>
-                <button type="button" className="epd-upload-btn" id="epdHeaderUploadBtn">
-                  <i className="bi bi-eye"></i> View-only profile
-                </button>
-              </div>
+              {!embedded && (
+                <>
+                  <div className="employment-page-intro">
+                    <div>
+                      <h1>Employment Details</h1>
+                      <p>Employment profile and organizational details for this employee.</p>
+                    </div>
+                    <button type="button" className="epd-upload-btn" id="epdHeaderUploadBtn">
+                      <i className="bi bi-eye"></i> View-only profile
+                    </button>
+                  </div>
 
-              {/* Employee Quick Info Card */}
-              <div className="esc-employee-bar">
-                <div className="esc-employee-main">
-                  <div className="esc-avatar">
-                    {getInitials(profile.first_name, profile.last_name)}
-                  </div>
-                  <div className="esc-employee-info">
-                    <div className="esc-name-row">
-                      <h3>{profile.first_name || 'Employee'} {profile.last_name || 'Name'}</h3>
-                      <span className="esc-status-badge"><span></span>Active</span>
+                  <div className="esc-employee-bar">
+                    <div className="esc-employee-main">
+                      <div className="esc-avatar">
+                        {getInitials(profile.first_name, profile.last_name)}
+                      </div>
+                      <div className="esc-employee-info">
+                        <div className="esc-name-row">
+                          <h3>{profile.first_name || 'Employee'} {profile.last_name || 'Name'}</h3>
+                          <span className="esc-status-badge"><span></span>Active</span>
+                        </div>
+                        <p>{profile.designation || employeeProfile?.designation || 'Senior Software Engineer'}</p>
+                        <div className="esc-employee-meta">
+                          <span><i className="bi bi-diagram-3"></i>{profile.department || employeeProfile?.department || 'Engineering'}</span>
+                          <span><i className="bi bi-code-slash"></i>{profile.team || employeeProfile?.team || 'Backend'}</span>
+                          <span><i className="bi bi-person-badge"></i>{profile.employee_code || employeeProfile?.employee_code || 'EMP-1360'}</span>
+                        </div>
+                      </div>
                     </div>
-                    <p>{profile.designation || employeeProfile?.designation || 'Senior Software Engineer'}</p>
-                    <div className="esc-employee-meta">
-                      <span><i className="bi bi-diagram-3"></i>{profile.department || employeeProfile?.department || 'Engineering'}</span>
-                      <span><i className="bi bi-code-slash"></i>{profile.team || employeeProfile?.team || 'Backend'}</span>
-                      <span><i className="bi bi-person-badge"></i>{profile.employee_code || employeeProfile?.employee_code || 'EMP-1360'}</span>
+                    <div className="esc-employee-side">
+                      <span className="esc-side-label">Profile Area</span>
+                      <strong>Employment Details</strong>
                     </div>
                   </div>
-                </div>
-                <div className="esc-employee-side">
-                  <span className="esc-side-label">Profile Area</span>
-                  <strong>Employment Details</strong>
-                </div>
-              </div>
+                </>
+              )}
 
               <div className="row g-4 align-items-start">
                 {/* Main Content */}

@@ -32,7 +32,7 @@ const STATUS_FILTER_LABELS = {
   maintenance: "Under Maintenance",
 };
 
-export default function Assets({ currentUser, employeeProfile }) {
+export default function Assets({ currentUser, employeeProfile, embedded = false }) {
   const user = currentUser || (employeeProfile?.user_id ? { id: employeeProfile.user_id, email: employeeProfile.email } : null);
   const [data, setData] = useState({ employee: null, assets: [] });
   const [loading, setLoading] = useState(true);
@@ -209,16 +209,16 @@ export default function Assets({ currentUser, employeeProfile }) {
                 <div className="employee-assets-page">
 
                     <div className="ea-page-header">
-                        <div>
+                        {!embedded && <div>
                             <h2>Employee Assets</h2>
                             <p>Manage assigned equipment, asset lifecycle, returns and maintenance records.</p>
-                        </div>
+                        </div>}
 
                         <div className="ea-header-actions">
-                            <button className="btn ea-btn-light" type="button" id="eaExportBtn">
+                            {!embedded && <button className="btn ea-btn-light" type="button" id="eaExportBtn">
                                 <i className="bi bi-download"></i>
                                 Export
-                            </button>
+                            </button>}
 
                             <button className="btn ea-btn-primary" type="button" data-bs-toggle="modal"
                                 data-bs-target="#eaAssignAssetModal">
@@ -237,7 +237,7 @@ export default function Assets({ currentUser, employeeProfile }) {
                     )}
                     {loading && <div className="text-muted mb-3">Loading assets...</div>}
 
-                    <div className="esc-employee-bar">
+                    <div className={`esc-employee-bar${embedded ? " d-none" : ""}`}>
                         <div className="esc-employee-main">
                             <div className="esc-avatar">{initials}</div>
 

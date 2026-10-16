@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Chart from "react-apexcharts";
 
-export default function Attendance({ currentUser, employeeProfile, onNavigate }) {
+export default function Attendance({ currentUser, employeeProfile, onNavigate, embedded = false }) {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState("");
@@ -234,7 +234,7 @@ export default function Attendance({ currentUser, employeeProfile, onNavigate })
       <div className="epa-page">
 
                         
-                        <div className="epa-page-header">
+                        <div className={`epa-page-header${embedded ? " d-none" : ""}`}>
                             <div>
 
                                 <h2 className="epa-title">Attendance</h2>
@@ -254,7 +254,7 @@ export default function Attendance({ currentUser, employeeProfile, onNavigate })
                         </div>
 
                         
-                        <div className="esc-employee-bar">
+                        <div className={`esc-employee-bar${embedded ? " d-none" : ""}`}>
 
                             <div className="esc-employee-main">
 

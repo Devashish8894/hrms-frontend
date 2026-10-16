@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Chart from "react-apexcharts";
 
-export default function Leaves({ currentUser, employeeProfile }) {
+export default function Leaves({ currentUser, employeeProfile, embedded = false }) {
   const [data, setData] = useState({ balances: [], leaveTypes: [], approvers: [], requests: [] });
   const [loading, setLoading] = useState(true);
   const [showApplyModal, setShowApplyModal] = useState(false);
@@ -349,17 +349,17 @@ export default function Leaves({ currentUser, employeeProfile }) {
                         )}
                         <div className="epl-page-header">
 
-                            <div>
+                            {!embedded && <div>
                                 <h2 className="epl-title">Leave Management</h2>
 
                                 <p className="epl-subtitle">
                                     Manage leave balances, requests, approvals and leave history.
                                 </p>
-                            </div>
+                            </div>}
 
                             <div className="epl-header-actions">
 
-                                <button type="button" className="btn" style={{ borderColor: '#4e36f5', color: '#4e36f5', backgroundColor: '#fff', fontWeight: '500', padding: '8px 16px', borderRadius: '6px' }} id="eplExportBtn" onClick={() => alert("Export functionality coming soon!")}><i className="bi bi-download"></i> Export</button>
+                                {!embedded && <button type="button" className="btn" style={{ borderColor: '#4e36f5', color: '#4e36f5', backgroundColor: '#fff', fontWeight: '500', padding: '8px 16px', borderRadius: '6px' }} id="eplExportBtn" onClick={() => alert("Export functionality coming soon!")}><i className="bi bi-download"></i> Export</button>}
 
                                 <button type="button" className="btn" style={{ backgroundColor: '#4e36f5', color: '#fff', fontWeight: '500', padding: '8px 16px', borderRadius: '6px' }} id="eplApplyLeaveBtn" onClick={() => { setLeaveSubmitError(""); setShowApplyModal(true); }}><i className="bi bi-plus-lg"></i> Apply Leave</button>
 
@@ -368,7 +368,7 @@ export default function Leaves({ currentUser, employeeProfile }) {
                         </div>
 
                         
-                        <div className="esc-employee-bar">
+                        <div className={`esc-employee-bar${embedded ? " d-none" : ""}`}>
 
                             <div className="esc-employee-main">
 
