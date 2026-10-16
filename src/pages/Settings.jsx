@@ -3,6 +3,17 @@ import CharacterOnlyInput from "../utils/CharacterOnlyInput";
 import IntegerOnlyInput from "../utils/IntegerOnlyInput";
 
 const API_BASE = import.meta.env.VITE_API_URL || "https://hrms-backend-5xo8.onrender.com";
+
+const readApiResponse = async (response) => {
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+        return response.json();
+    }
+    const body = await response.text();
+    throw new Error(body.trim().startsWith("<")
+        ? `Server returned an unexpected response (${response.status}).`
+        : body || `Request failed (${response.status}).`);
+};
 const EMPLOYEE_SHORTCUTS = [
     { id: "dashboard", label: "Employee Dashboard", description: "Your workspace overview", icon: "bi-grid", color: "blue" },
     { id: "apply-leave", label: "Apply Leave", description: "Request time off", icon: "bi-calendar-plus", color: "purple" },
@@ -156,12 +167,32 @@ export default function Settings({ currentUser, employeeProfile }) {
                 const response = await fetch(
                     `${API_BASE}/api/employee/shortcut-selections/${currentUser.id}`
                 );
-                const data = await response.json();
+                if (response.status === 404) {
+                    const localSaved = localStorage.getItem(`shortcut_selections_${currentUser.id}`);
+                    if (localSaved) {
+                        try {
+                            setSelectedShortcutIds(JSON.parse(localSaved));
+                        } catch {
+                            setSelectedShortcutIds([]);
+                        }
+                    } else {
+                        setSelectedShortcutIds([]);
+                    }
+                    return;
+                }
+                const data = await readApiResponse(response);
                 if (!response.ok) {
                     throw new Error(data.message || "Unable to load shortcut selections.");
                 }
                 setSelectedShortcutIds(data.shortcutIds || []);
             } catch (error) {
+                const localSaved = localStorage.getItem(`shortcut_selections_${currentUser.id}`);
+                if (localSaved) {
+                    try {
+                        setSelectedShortcutIds(JSON.parse(localSaved));
+                        return;
+                    } catch {}
+                }
                 setShortcutSelectionError(error.message || "Unable to load shortcut selections.");
             } finally {
                 setShortcutSelectionsLoading(false);
@@ -183,7 +214,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                 const response = await fetch(
                     `${API_BASE}/api/employee/personal-info/${currentUser.id}`
                 );
-                const data = await response.json();
+                const data = await readApiResponse(response);
                 if (!response.ok) {
                     throw new Error(data.message || "Unable to load personal information.");
                 }
@@ -210,7 +241,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                 const response = await fetch(
                     `${API_BASE}/api/employee/contact-info/${currentUser.id}`
                 );
-                const data = await response.json();
+                const data = await readApiResponse(response);
                 if (!response.ok) {
                     throw new Error(data.message || "Unable to load contact information.");
                 }
@@ -237,7 +268,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                 const response = await fetch(
                     `${API_BASE}/api/employee/employment-info/${currentUser.id}`
                 );
-                const data = await response.json();
+                const data = await readApiResponse(response);
                 if (!response.ok) {
                     throw new Error(data.message || "Unable to load employment information.");
                 }
@@ -264,7 +295,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                 const response = await fetch(
                     `${API_BASE}/api/employee/bank-info/${currentUser.id}`
                 );
-                const data = await response.json();
+                const data = await readApiResponse(response);
                 if (!response.ok) {
                     throw new Error(data.message || "Unable to load bank information.");
                 }
@@ -291,7 +322,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                 const response = await fetch(
                     `${API_BASE}/api/employee/identity-info/${currentUser.id}`
                 );
-                const data = await response.json();
+                const data = await readApiResponse(response);
                 if (!response.ok) {
                     throw new Error(data.message || "Unable to load identity information.");
                 }
@@ -318,7 +349,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                 const response = await fetch(
                     `${API_BASE}/api/employee/emergency-contact/${currentUser.id}`
                 );
-                const data = await response.json();
+                const data = await readApiResponse(response);
                 if (!response.ok) {
                     throw new Error(data.message || "Unable to load emergency contact.");
                 }
@@ -365,7 +396,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                 `${API_BASE}/api/employee/personal-info/${currentUser.id}/profile-pic`,
                 { method: "POST", body: formData }
             );
-            const data = await response.json();
+            const data = await readApiResponse(response);
             if (!response.ok) {
                 throw new Error(data.message || "Unable to upload profile picture.");
             }
@@ -393,6 +424,7 @@ export default function Settings({ currentUser, employeeProfile }) {
         setShortcutSelectionsSaving(true);
         setShortcutSelectionError("");
         try {
+            localStorage.setItem(`shortcut_selections_${currentUser.id}`, JSON.stringify(nextShortcutIds));
             const response = await fetch(
                 `${API_BASE}/api/employee/shortcut-selections/${currentUser.id}`,
                 {
@@ -401,14 +433,18 @@ export default function Settings({ currentUser, employeeProfile }) {
                     body: JSON.stringify({ shortcutIds: nextShortcutIds }),
                 }
             );
-            const data = await response.json();
+            if (response.status === 404) {
+                // Backend endpoint not deployed yet; local selection stored safely
+                return;
+            }
+            const data = await readApiResponse(response);
             if (!response.ok) {
                 throw new Error(data.message || "Unable to save shortcut selections.");
             }
-            setSelectedShortcutIds(data.shortcutIds || []);
+            setSelectedShortcutIds(data.shortcutIds || nextShortcutIds);
         } catch (error) {
-            setSelectedShortcutIds(previousShortcutIds);
-            setShortcutSelectionError(error.message || "Unable to save shortcut selections.");
+            // Keep local selection if network/API failed
+            console.warn("Shortcut selections API error:", error);
         } finally {
             setShortcutSelectionsSaving(false);
         }
@@ -464,7 +500,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                     }),
                 }
             );
-            const data = await response.json();
+            const data = await readApiResponse(response);
             if (!response.ok) {
                 throw new Error(data.message || "Unable to update emergency contact.");
             }
@@ -544,7 +580,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                     }),
                 }
             );
-            const data = await response.json();
+            const data = await readApiResponse(response);
             if (!response.ok) {
                 throw new Error(data.message || "Unable to update personal information.");
             }
@@ -702,7 +738,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                     }),
                 }
             );
-            const data = await response.json();
+            const data = await readApiResponse(response);
             if (!response.ok) {
                 throw new Error(data.message || "Unable to update contact information.");
             }
@@ -794,7 +830,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                     }),
                 }
             );
-            const data = await response.json();
+            const data = await readApiResponse(response);
             if (!response.ok) {
                 throw new Error(data.message || "Unable to update bank information.");
             }
@@ -876,7 +912,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                     }),
                 }
             );
-            const data = await response.json();
+            const data = await readApiResponse(response);
             if (!response.ok) {
                 throw new Error(data.message || "Unable to update identity information.");
             }
@@ -922,7 +958,7 @@ export default function Settings({ currentUser, employeeProfile }) {
                     body: JSON.stringify({ password: accountRevealPassword }),
                 }
             );
-            const data = await response.json();
+            const data = await readApiResponse(response);
             if (!response.ok) {
                 throw new Error(data.message || "Unable to reveal account number.");
             }
